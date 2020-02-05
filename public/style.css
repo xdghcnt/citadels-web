@@ -1,0 +1,340 @@
+body {
+    font-size: 16px;
+    color: #333;
+    background-color: #BBBBBB;
+}
+
+p {
+    margin: 5px 0;
+}
+
+h1, h2, h3 {
+    margin: 0;
+}
+
+.player {
+    padding: 3px;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.player.self {
+    font-weight: bold;
+}
+
+.player.offline {
+    color: #b1afaf;
+}
+
+.player.offline .player-name-text {
+    box-shadow: 0 0 15px 4px grey;
+    text-decoration: line-through;
+}
+
+.no-player .player.offline .player-name-text {
+    text-decoration: none;
+}
+
+.spectators .player.offline .player-name-text {
+    box-shadow: none;
+}
+
+
+
+
+
+
+
+
+
+.cards-list {
+    display: flex;
+}
+
+.cards-list .card, .cards-list .character {
+    margin: 2px;
+}
+
+.phaze-block, .players-section, .hand-section, .action-section, .character-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 10px;
+}
+
+
+.character-section .cards-list .status {
+    height: 15px;
+    text-align: center;
+    color: red;
+}
+
+.character-section .cards-list .discard .character {
+    opacity: 0.2;
+}
+
+
+.character-section .cards-list .character {
+    height: 15px;
+}
+
+.player-slot {
+    display: flex;
+    border: solid black 2px;
+    height: 190px;
+    margin: 2px;
+}
+
+.profile {
+    display: flex;
+    flex-direction: column;
+    border-right: solid black 1px;
+}
+
+.player-slot.my-turn {
+    border: solid red 2px;
+}
+
+.player-slot.winner {
+    border: solid gold 2px;
+}
+
+.profile-head {
+    display: flex;
+}
+
+.profile-name {
+    margin: 3px;
+    font-size: 16px;
+    width: 140px;
+    color: white;
+}
+
+.player-slot-0 .profile-name {
+    background: #c62828;
+}
+
+.player-slot-1 .profile-name {
+    background: #283593;
+}
+
+.player-slot-2 .profile-name {
+    background: #2e7d32;
+}
+
+.player-slot-3 .profile-name {
+    background: #ef6c00;
+}
+
+.player-slot-4 .profile-name {
+    background: #6a1b9a;
+}
+
+.player-slot-5 .profile-name {
+    background: #00838f;
+}
+
+.player-slot-6 .profile-name {
+    background: #b4bf45;
+}
+
+.characters-list {
+    display: flex;
+    height: 130px;
+    justify-content: center;
+}
+
+.profile button {
+    position: relative;
+    bottom: 20px;
+    width: 75px;
+}
+
+.resources {
+    height: 40px;
+    display: flex;
+}
+
+.rs-block {
+    margin: 3px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 50px;
+}
+
+.resource-count {
+    font-size: 22px;
+}
+
+.rs-block.gold:before, .rs-block.hand:before, .profile-crown {
+    background: url('../sprite.png') no-repeat top left;
+    width: 33px;
+    height: 33px;
+}
+
+.rs-block.gold:before, .rs-block.hand:before {
+    content: '';
+    position: relative;
+}
+
+.rs-block.gold:before {
+    background-position: -33px 0;
+}
+
+.rs-block.hand:before {
+    background-position: -66px 0;
+}
+
+.districts {
+    display: flex;
+    flex-direction: column;
+    width: 220px;
+    justify-content: space-between;
+}
+
+.districts .cards-list {
+    display: flex;
+    margin: 28px 10px 0px 10px;
+}
+
+.districts .cards-list .card:not(:first-child) {
+    margin-left: -55px;
+}
+
+.districts .cards-list .card:hover {
+    z-index: 1;
+}
+
+.districts .cards-list .card:hover {
+    border: 3px solid gold;
+}
+
+.score-block {
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+.spectators-section {
+    display: none;
+    text-align: center;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 1;
+}
+
+.spectators-section.active {
+    display: block;
+}
+
+.spectators {
+    display: inline-block;
+    padding: 6px;
+    cursor: pointer;
+    background: rgba(255, 252, 245, 0.58);
+    user-select: none;
+    white-space: nowrap;
+    height: 20px;
+}
+
+.spectators .player {
+    display: inline-block;
+    margin: 0 4px;
+    padding: 0;
+}
+
+.host-controls {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    padding: 6px;
+    background: rgba(255, 252, 245, 0.58);
+    user-select: none;
+    cursor: default;
+    text-align: right;
+    z-index: 2;
+}
+
+.host-controls:hover .host-controls:focus{
+    display: block;
+}
+
+.side-buttons {
+    display: none;
+}
+
+.host-controls:hover .side-buttons {
+    display: inline-block;
+}
+
+.settings-button {
+    cursor: pointer;
+}
+
+.settings-button:hover {
+    background: #d4d4d4;
+}
+
+.settings-button.inactive {
+    opacity: 0.3;
+}
+
+.character {
+    background: url('../character.png');
+    width: 75px; 
+    height: 120px;
+    background-size: 675px;
+}
+
+.character.character1 { background-position: 0 0; } 
+.character.character2 { background-position: -75px 0; } 
+.character.character3 { background-position: -150px 0; } 
+.character.character4 { background-position: -225px 0; } 
+.character.character5 { background-position: -300px 0; } 
+.character.character6 { background-position: -375px 0; } 
+.character.character7 { background-position: -450px 0; } 
+.character.character8 { background-position: -525px 0; } 
+.character.character0 { background-position: -600px 0; } 
+
+.card {
+    background: url('../card.png');
+    width: 75px; height: 120px;
+    background-size: 2175px;
+}
+.card.card1 { background-position: 0 0; }
+.card.card2 { background-position: -75px 0; } 
+.card.card3 { background-position: -150px 0; }
+.card.card4 { background-position: -225px 0; } 
+.card.card5 { background-position: -300px 0; } 
+.card.card6 { background-position: -375px 0; } 
+.card.card7 { background-position: -450px 0; } 
+.card.card8 { background-position: -525px 0; } 
+.card.card9 { background-position: -600px 0; } 
+.card.card10 { background-position: -675px 0; } 
+.card.card11 { background-position: -750px 0; } 
+.card.card12 { background-position: -825px 0; } 
+.card.card13 { background-position: -900px 0; }
+.card.card14 { background-position: -975px 0; } 
+.card.card15 { background-position: -1050px 0; } 
+.card.card16 { background-position: -1125px 0; } 
+.card.card17 { background-position: -1200px 0; } 
+
+.card.card18 { background-position: -1275px 0; } 
+.card.card19 { background-position: -1350px 0; } 
+.card.card20 { background-position: -1425px 0; } 
+.card.card21 { background-position: -1500px 0; } 
+.card.card22 { background-position: -1575px 0; } 
+.card.card23 { background-position: -1650px 0; }
+.card.card24 { background-position: -1725px 0; } 
+.card.card25 { background-position: -1800px 0; } 
+.card.card26 { background-position: -1875px 0; } 
+.card.card27 { background-position: -1950px 0; } 
+.card.card28 { background-position: -2025px 0; }
+.card.card29 { background-position: -2100px 0; }  
+
+.districts .card:hover {
+    z-index: 1;
+}
