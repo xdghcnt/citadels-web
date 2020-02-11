@@ -170,7 +170,7 @@ h1, h2, h3 {
 }
 
 .rs-block.gold:before, .rs-block.hand:before, .profile-crown {
-    background: url('../sprite.png') no-repeat top left;
+    background: url('./sprite.png') no-repeat top left;
     width: 33px;
     height: 33px;
 }
@@ -283,7 +283,7 @@ h1, h2, h3 {
 }
 
 .character {
-    background: url('../character.png');
+    background: url('./character.png');
     width: 75px; 
     height: 120px;
     background-size: 675px;
@@ -300,7 +300,7 @@ h1, h2, h3 {
 .character.character0 { background-position: -600px 0; } 
 
 .card {
-    background: url('../card.png');
+    background: url('./card.png');
     width: 75px; height: 120px;
     background-size: 2175px;
 }

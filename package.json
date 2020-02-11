@@ -1,9 +1,13 @@
 {
-  "name": "citadels-web",
+  "name": "citadels",
   "version": "0.0.1",
-  "main": "server.js",
+  "main": "module.js",
+  "private": true,
+  "files": [
+    "module.js",
+    "public"
+  ],
   "dependencies": {
-    "express": "^4.17.1",
-    "socket.io": "^2.3.0"
+    "ws-server-engine": "git://github.com/xdghcnt/ws-server-engine.git"
   }
 }
