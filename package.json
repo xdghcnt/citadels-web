@@ -5,6 +5,7 @@
   "private": true,
   "files": [
     "module.js",
+    "utils.js",
     "public"
   ],
   "dependencies": {
