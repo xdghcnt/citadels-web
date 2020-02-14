@@ -142,10 +142,11 @@ class Game extends React.Component {
 
     componentDidMount() {
         const initArgs = {};
-        if (!localStorage.citadelsUserId) {
+        if (!localStorage.citadelsUserId || !localStorage.citadelsUserToken) {
             while (!localStorage.userName)
                 localStorage.userName = prompt("Your name");
             localStorage.citadelsUserId = makeId();
+            localStorage.citadelsUserToken = makeId();
         }
         if (!location.hash)
             history.replaceState(undefined, undefined, location.origin + location.pathname + "#" + makeId());
@@ -153,14 +154,16 @@ class Game extends React.Component {
             history.replaceState(undefined, undefined, location.origin + location.pathname + location.hash);
         initArgs.roomId = location.hash.substr(1);
         initArgs.userId = this.userId = localStorage.citadelsUserId;
+        initArgs.token = this.userToken = localStorage.citadelsUserToken;
+        initArgs.wssToken = window.wssToken;
         initArgs.userName = localStorage.userName;
-        this.socket = io();
+        this.socket = window.socket.of("citadels");
         this.socket.on("state", (state) => {
-             this.setState(Object.assign({
+            this.setState(Object.assign({
                 userId: this.userId,
                 userSlot: state.playerSlots.indexOf(this.userId)
-            }, state))
-            console.log('after state', this.state)
+            }, state));
+            console.log('after state', this.state);
         });
         this.socket.on("player-state", (player) => {
             this.setState(Object.assign(this.state, {
@@ -168,14 +171,22 @@ class Game extends React.Component {
             }));
             console.log('after player-state', this.state);
         });
-        this.socket.on("disconnect", (event) => {
+        this.socket.on("prompt-delete-prev-room", (roomList) => {
+            if (localStorage.acceptDelete =
+                prompt(`Limit for hosting rooms per IP was reached: ${roomList.join(", ")}. Delete one of rooms?`, roomList[0]))
+                location.reload();
+        });
+        this.socket.on("ping", (id) => {
+            this.socket.emit("pong", id);
+        });
+        window.socket.on("disconnect", (event) => {
             this.setState({
                 inited: false,
                 disconnected: true,
                 disconnectReason: event.reason
             });
         });
-        document.title = `New(2) Citadels - ${initArgs.roomId}`;
+        document.title = `Citadels - ${initArgs.roomId}`;
         this.socket.emit("init", initArgs);
     }
 
