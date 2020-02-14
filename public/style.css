@@ -75,7 +75,7 @@ h1, h2, h3 {
 
 .player-slot {
     display: flex;
-    height: 273px;
+    height: 282px;
     margin: 5px;
     background: #ffffffab;
     box-shadow: 0 0 6px 1px black;
@@ -140,6 +140,7 @@ h1, h2, h3 {
     justify-content: center;
     width: 145px;
     padding: 0 5px;
+    align-items: center;
 }
 
 .profile button {
@@ -294,6 +295,7 @@ h1, h2, h3 {
     width: 130px;
     height: 208px;
     background-size: cover;
+    margin: 0 6px;
 }
 
 .character-section .character {
@@ -407,7 +409,7 @@ body {
 }
 
 .character-container {
-    margin: 0 2px;
+    display: flex;
 }
 
 .kicked {

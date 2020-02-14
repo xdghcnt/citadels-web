@@ -352,7 +352,10 @@ class Game extends React.Component {
         evt.stopPropagation();
         popup.confirm({content: `Give host ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("give-host", id));
     }
-
+    
+    handleTakeCharacter(char) {
+        this.socket.emit("take-character", char);
+    }
 
     render() {
         const
