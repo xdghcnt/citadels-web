@@ -140,6 +140,7 @@ h1, h2, h3 {
     justify-content: center;
     width: 145px;
     padding: 0 5px;
+    align-items: center;
 }
 
 .profile button {
