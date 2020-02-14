@@ -108,7 +108,7 @@ h1, h2, h3 {
 .profile-name {
     margin: 3px;
     font-size: 16px;
-    width: 140px;
+    width: 155px;
     color: white;
 }
 
@@ -147,8 +147,7 @@ h1, h2, h3 {
 }
 
 .profile button {
-    position: relative;
-    bottom: 20px;
+    position: absolute;
     width: 75px;
 }
 
@@ -337,4 +336,14 @@ h1, h2, h3 {
 
 .districts .card:hover {
     z-index: 1;
+}
+
+.characters {
+    display: flex;
+    width: 155px;
+    justify-content: space-around;
+}
+
+.discard .cards-list {
+    opacity: 0.5;
 }
