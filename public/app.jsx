@@ -14,22 +14,45 @@ class Player extends React.Component {
     render() {
         const
             data = this.props.data,
+            game = this.props.game,
             id = this.props.id,
+            isHost = data.userId === data.hostId,
             hasPlayer = id !== null;
         return (
             <div className={
                 "player"
-                    + (!~data.onlinePlayers.indexOf(id) ? " offline" : "")
-                    + (id === data.userId ? " self" : "")
-                }
+                + (!~data.onlinePlayers.indexOf(id) ? " offline" : "")
+                + (id === data.userId ? " self" : "")
+            }
                  onTouchStart={(e) => e.target.focus()}
                  data-playerId={id}>
                 {hasPlayer
-                        ? data.playerNames[id]
-                        : (data.teamsLocked
-                            ? (<div className="slot-empty">Empty</div>)
-                            : (<div className="join-slot-button"
-                                    onClick={() => this.props.handlePlayerJoin(this.props.slot)}>Seat</div>))}
+                    ? data.playerNames[id]
+                    : (data.teamsLocked
+                        ? (<div className="slot-empty">Empty</div>)
+                        : (<div className="join-slot-button"
+                                onClick={() => this.props.handlePlayerJoin(this.props.slot)}>Seat</div>))}
+                {hasPlayer
+                    ? (<div className="player-host-controls">
+                        {isHost && data.userId !== id ?
+                            (<i className="material-icons host-button"
+                                title="Give host"
+                                onClick={(evt) => game.handleGiveHost(id, evt)}>
+                                vpn_key
+                            </i>) : ""}
+                        {isHost && data.userId !== id ?
+                            (<i className="material-icons host-button"
+                                title="Remove"
+                                onClick={(evt) => game.handleRemovePlayer(id, evt)}>
+                                delete_forever
+                            </i>) : ""}
+                        {(data.hostId === id) ? (
+                            <i className="material-icons host-button inactive"
+                               title="Game host">
+                                stars
+                            </i>
+                        ) : ""}
+                    </div>) : ""}
             </div>
         );
     }
@@ -37,7 +60,9 @@ class Player extends React.Component {
 
 class Spectators extends React.Component {
     render() {
-        const data = this.props.data,
+        const
+            data = this.props.data,
+            game = this.props.game,
             handleSpectatorsClick = this.props.handleSpectatorsClick;
         return (
             <div
@@ -46,7 +71,7 @@ class Spectators extends React.Component {
                 Spectators:
                 {
                     data.spectators.length ? data.spectators.map(
-                        (player, index) => (<Player key={index} data={data} id={player} />)) : " ..."
+                        (player, index) => (<Player key={index} data={data} id={player} game={game}/>)) : " ..."
                 }
             </div>
         );
@@ -56,11 +81,19 @@ class Spectators extends React.Component {
 class Card extends React.Component {
     render() {
         const
+            game = this.props.game,
             card = this.props.card,
-            type = this.props.type
+            type = this.props.type,
+            noZoom = this.props.noZoom;
         return (
-            <div className={`${type} ${type}${card} card-item`}
-                onClick={this.props.onClick}>
+            <div className={`${type} card-item ${noZoom ? "no-zoom" : ""}`}
+                 style={{"background-position": `-${(card - 1) * 130}px 0px`}}
+                 onMouseDown={(e) => game.handleCardPress(e)}
+                 onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>
+                {!noZoom ? (<div className="card-zoom-button material-icons"
+                                 onMouseDown={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
+                {!noZoom ? (<div className={`card-item-zoomed ${type}`}
+                                 style={{"background-position": `-${(card - 1) * 430}px 0px`}}/>) : ""}
             </div>
         );
     }
@@ -75,64 +108,71 @@ class PlayerSlot extends React.Component {
             player = data.playerSlots[slot],
             districts = data.playerDistricts[slot],
             character = player === data.userId && data.player ? data.player.character : data.playerCharacter[slot],
-            magicianAction = data.player && data.player.action == 'magician-action' && data.phase == 2,
+            magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
             score = data.playerScore[slot],
-            isMyTurn = slot == data.currentPlayer,
-            isWinner = slot == data.winnerPlayer;
+            isMyTurn = slot === data.currentPlayer,
+            isWinner = slot === data.winnerPlayer;
         return (
             <div className={
-                    `player-slot player-slot-${slot}`
-                    + (isMyTurn ? " my-turn" : "")
-                    + (isWinner ? " winner" : "")
-                }>
+                `player-slot player-slot-${slot}`
+                + (isMyTurn ? " my-turn" : "")
+                + (isWinner ? " winner" : "")
+            }>
                 <div className="profile">
+                    <div className="profile-bg">
+                        <i className="material-icons">person</i>
+                    </div>
                     <div className='profile-head'>
                         <div className="profile-name">
                             <Player id={player} data={data} slot={slot}
-                                handlePlayerJoin={(slot) => game.handlePlayerJoin(slot)} />
+                                    game={game}
+                                    handlePlayerJoin={(slot) => game.handlePlayerJoin(slot)}/>
                         </div>
                     </div>
                     <div className="characters-list">
                         {character != null ? 
-                            <div className="characters">
+                            <div className="character-container">
                                 {character.map((card, id) => (
-                                    <Card key={id} card={card} type="character" />
+                                    <Card key={id} card={card} type="character" game={game} />
                                 ))}
                                 {magicianAction ?
                                     <button onClick={() => game.handleMagician(slot)}>
                                         {slot == data.userSlot ? 'Discard' : 'Exchange'}
                                     </button>
-                                : null}
+                                    : null}
                             </div>
-                        : null}
-				    </div>
-                    { player ? 
-                        <div className = 'resources'>
+                            : null}
+                    </div>
+                    {player ?
+                        <div className='resources'>
                             <div className="rs-block gold">
                                 <div className="resource-count">{data.playerGold[slot] || 0}</div>
                             </div>
                             <div className="rs-block hand">
                                 <div className="resource-count">{data.playerHand[slot] || 0}</div>
                             </div>
-                            {data.king == slot ? 
+                            {data.king == slot ?
                                 <div className="profile-crown"></div>
-                            : null}
+                                : null}
                         </div>
-                    : null}
-                    
+                        : null}
+
                 </div>
                 <div className='districts'>
+                    <div className="districts-bg">
+                        <i className="material-icons">home</i>
+                    </div>
                     <div className='cards-list'>
                         {districts && districts.map((card, id) => (
-                            <Card key={id} card={card} type="card" 
-                            onClick={() => game.handleDestroy(slot, id)} />
+                            <Card key={id} card={card} type="card" game={game}
+                                  onClick={() => game.handleDestroy(slot, id)}/>
                         ))}
                     </div>
                     {score ?
                         <div className="score-block">
-					        <div className="score">Score: {score}</div>
-    			        </div>
-                    : null }
+                            <div className="score">Score: {score}</div>
+                        </div>
+                        : null}
                 </div>
             </div>
         )
@@ -265,39 +305,94 @@ class Game extends React.Component {
         localStorage.userName = name;
     }
 
+    zoomCard(node) {
+        if (this.zoomed) {
+            this.zoomed.classList.remove("zoomed");
+            this.zoomed = null;
+        } else if (node) {
+            node.classList.add("zoomed");
+            this.zoomed = node;
+        }
+    }
+
+    handleCardZoomClick(e) {
+        e.stopPropagation();
+        this.zoomCard(e.target.parentNode);
+    }
+
+    handleCardClick(e, clickFunc) {
+        if (this.zoomed)
+            this.zoomCard();
+        else if (clickFunc)
+            clickFunc();
+    }
+
+    handleCardPress(e) {
+        const node = e.target;
+        if (!node.classList.contains("no-zoom")) {
+            e.stopPropagation();
+            this.wasReleased = false;
+            clearTimeout(this.holdTimeout);
+            this.holdTimeout = setTimeout(() => {
+                if (!this.wasReleased)
+                    this.zoomCard(node);
+            }, 150);
+        }
+    }
+
+    handleBodyRelease() {
+        this.wasReleased = true;
+        //this.zoomCard();
+    }
+
+    handleRemovePlayer(id, evt) {
+        evt.stopPropagation();
+        popup.confirm({content: `Removing ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("remove-player", id));
+    }
+
+    handleGiveHost(id, evt) {
+        evt.stopPropagation();
+        popup.confirm({content: `Give host ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("give-host", id));
+    }
+
+
     render() {
-        const data = this.state,
+        const
+            data = this.state,
             isHost = data.hostId === data.userId,
-            notEnoughPlayers = data.phase === 0 && data.playerSlots.filter((slot) => slot !== null).length < 2;
+            playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
+            notEnoughPlayers = data.phase === 0 && playerCount < 2;
 
         if (this.state.disconnected)
             return (<div
                 className="kicked">Disconnected{this.state.disconnectReason ? ` (${this.state.disconnectReason})` : ""}</div>);
         else if (this.state.inited) {
             const activeSlots = [];
-            data.playerSlots.forEach((userId,slot) => {
+            data.playerSlots.forEach((userId, slot) => {
                 if (userId != null) activeSlots.push(slot);
             });
             const
                 slots = (!data.teamsLocked ? data.playerSlots : activeSlots)
                     .map((value, slot) => !data.teamsLocked ? slot : value);
             return (
-                <div className="game">
+                <div
+                    className={`game ${(data.phase > 0 && playerCount <= 3) ? "double-roles" : ""}`}
+                    onMouseUp={(evt) => this.handleBodyRelease(evt)}>
                     {data.phase != 0 ?
                         <div className="character-section">
                             <div className="cards-list">
-                                {[1,2,3,4,5,6,7,8].map((card, id) => (
-                                    <div className={~data.characterFace.indexOf(card) ? 'discard': ''}>
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map((card, id) => (
+                                    <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
                                         <div className="status">
-                                            {card == data.assassined ? "assassined" : null}
-                                            {card == data.robbed ? "robbed" : null}
+                                            {card === data.assassined ? "assassined" : null}
+                                            {card === data.robbed ? "robbed" : null}
                                         </div>
-                                        <Card key={id} card={card} type="character"/>
+                                        <Card key={id} card={card} type="character" noZoom={true} game={this}/>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                    : null}
+                        : null}
                     {data.player && data.currentPlayer == data.userSlot ?
                         <div className="action-section"> 
                             {data.phase == 1 ? 
@@ -308,86 +403,96 @@ class Game extends React.Component {
                                     <p>{data.player.action === "discard" ? "Discard" : "Choose"} character:</p>
                                     <div className="cards-list">
                                         {data.player && data.player.choose && data.player.choose.map((card, id) => (
-                                            <Card key={id} card={card} type="character" onClick={() => this.handleActionCharacter(id)} />
+                                            <Card key={id} card={card} type="character" game={this}
+                                                  onClick={() => this.handleTakeCharacter(id)}/>
                                         ))}
                                     </div>
                                 </div>
-                            : null}
-                            {data.phase == 2 && data.player.action === 'assassin-action' ? 
+                                : null}
+                            {data.phase == 2 && data.player.action === 'assassin-action' ?
                                 <div className="choose-character">
                                     <p>Choose character to assassinate:</p>
                                     <div className="cards-list">
-                                        {[2,3,4,5,6,7,8].filter(id => !~data.characterFace.indexOf(id)).map((card, id) => (
-                                            <Card key={id} card={card} type="character" onClick={() => this.handleAssassined(card)} />
+                                        {[2, 3, 4, 5, 6, 7, 8].filter(id => !~data.characterFace.indexOf(id)).map((card, id) => (
+                                            <Card key={id} card={card} type="character" game={this}
+                                                  onClick={() => this.handleAssassined(card)}/>
                                         ))}
                                     </div>
                                 </div>
-                            : null}
-                            {data.phase == 2 && data.player.action === 'thief-action' ? 
+                                : null}
+                            {data.phase == 2 && data.player.action === 'thief-action' ?
                                 <div className="choose-character">
                                     <p>Choose character to rob:</p>
                                     <div className="cards-list">
-                                        {[3,4,5,6,7,8].filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id))
+                                        {[3, 4, 5, 6, 7, 8].filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id))
                                             .map((card, id) => (
-                                            <Card key={id} card={card} type="character" onClick={() => this.handleRob(card)} />
-                                        ))}
+                                                <Card key={id} card={card} type="character" game={this}
+                                                      onClick={() => this.handleRob(card)}/>
+                                            ))}
                                     </div>
                                 </div>
-                            : null}
+                                : null}
                             {data.phase == 2 ?
                                 <div className="action-button">
-                                    {!data.tookResource ? <button onClick={() => this.handleTakeResource('coins')}>Take 2 coins</button> : null}
-                                    {!data.tookResource ? <button onClick={() => this.handleTakeResource('card')}>Take a card</button> : null}
-                                    {data.incomeAction ? <button onClick={() => this.handleTakeIncome()}>Take income</button> : null}
-                                    {data.tookResource ? <button onClick={() => this.handleEndTurn()}>End turn</button> : null}
+                                    {!data.tookResource ?
+                                        <button onClick={() => this.handleTakeResource('coins')}>Take 2
+                                            coins</button> : null}
+                                    {!data.tookResource ? <button onClick={() => this.handleTakeResource('card')}>Take a
+                                        card</button> : null}
+                                    {data.incomeAction ?
+                                        <button onClick={() => this.handleTakeIncome()}>Take income</button> : null}
+                                    {data.tookResource ?
+                                        <button onClick={() => this.handleEndTurn()}>End turn</button> : null}
                                 </div>
-                            : null}
-                            {data.phase == 3 ? 
+                                : null}
+                            {data.phase == 3 ?
                                 <div className="choose-card">
                                     <p>Choose card:</p>
                                     <div className="cards-list">
                                         {data.player && data.player.choose && data.player.choose.map((card, id) => (
-                                            <Card key={id} card={card} type="card" onClick={() => this.handleTakeCard(id)} />
+                                            <Card key={id} card={card} type="card" game={this}
+                                                  onClick={() => this.handleTakeCard(id)}/>
                                         ))}
                                     </div>
                                 </div>
-                            : null}
+                                : null}
                         </div>
-                    : null}
+                        : null}
                     {data.player && data.player.hand ?
                         <div className="hand-section">
                             <p>Your cards:</p>
                             <div className='cards-list'>
                                 {data.player && data.player.hand && data.player.hand.map((card, id) => (
-                                    <Card key={id} card={card} type="card" onClick={() => this.handleBuild(id)} />
+                                    <Card key={id} card={card} type="card" onClick={() => this.handleBuild(id)}
+                                          game={this}/>
                                 ))}
                             </div>
-                        </div>                   
-                    : null}
+                        </div>
+                        : null}
                     <div className="players-section">
                         {slots.map((slot) => (<PlayerSlot data={data} slot={slot} game={this}/>))}
                     </div>
                     <div className={"spectators-section"
-                            + ((data.spectators.length > 0 || !data.teamsLocked) ? " active" : "")
-                        }>
-                        <Spectators data={data} handleSpectatorsClick={() => this.handleSpectatorsClick()}/>
+                    + ((data.spectators.length > 0 || !data.teamsLocked) ? " active" : "")
+                    }>
+                        <Spectators game={this} data={data} handleSpectatorsClick={() => this.handleSpectatorsClick()}/>
                     </div>
                     <div className="host-controls">
                         <div className="side-buttons">
                             {isHost ? (data.teamsLocked
                                 ? (<i onClick={() => this.handleToggleTeamLockClick()}
-                                    className="material-icons start-game settings-button">lock_outline</i>)
+                                      className="material-icons start-game settings-button">lock_outline</i>)
                                 : (<i onClick={() => this.handleToggleTeamLockClick()}
-                                    className="material-icons start-game settings-button">lock_open</i>)) : ""}
+                                      className="material-icons start-game settings-button">lock_open</i>)) : ""}
                             {isHost ? (data.phase === 0
                                 ? (<i onClick={() => this.handleClickTogglePause()}
-                                    title={notEnoughPlayers ? "Not enough players" : ""}
-                                    className={`material-icons start-game settings-button ${notEnoughPlayers
-                                        ? "inactive" : ""}`}>play_arrow</i>)
+                                      title={notEnoughPlayers ? "Not enough players" : ""}
+                                      className={`material-icons start-game settings-button ${notEnoughPlayers
+                                          ? "inactive" : ""}`}>play_arrow</i>)
                                 : (<i onClick={() => this.handleClickTogglePause()}
-                                    className="material-icons start-game settings-button">sync</i>)) : ""}
+                                      className="material-icons start-game settings-button">sync</i>)) : ""}
                             <i onClick={() => this.handleClickChangeName()}
-                                className="toggle-theme material-icons settings-button">edit</i>
+                               className="toggle-theme material-icons settings-button">edit</i>
                         </div>
                         <i className="settings-hover-button material-icons">settings</i>
                     </div>
@@ -396,4 +501,5 @@ class Game extends React.Component {
 
     }
 }
+
 ReactDOM.render(<Game/>, document.getElementById('root'));
