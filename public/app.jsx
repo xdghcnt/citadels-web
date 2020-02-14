@@ -130,9 +130,11 @@ class PlayerSlot extends React.Component {
                         </div>
                     </div>
                     <div className="characters-list">
-                        {character != null ?
+                        {character != null ? 
                             <div className="character-container">
-                                <Card card={character} type="character" game={game}/>
+                                {character.map((card, id) => (
+                                    <Card key={id} card={card} type="character" game={game} />
+                                ))}
                                 {magicianAction ?
                                     <button onClick={() => game.handleMagician(slot)}>
                                         {slot == data.userSlot ? 'Discard' : 'Exchange'}
@@ -203,13 +205,11 @@ class Game extends React.Component {
                 userId: this.userId,
                 userSlot: state.playerSlots.indexOf(this.userId)
             }, state));
-            console.log('after state', this.state);
         });
         this.socket.on("player-state", (player) => {
             this.setState(Object.assign(this.state, {
                 player: player
             }));
-            console.log('after player-state', this.state);
         });
         this.socket.on("prompt-delete-prev-room", (roomList) => {
             if (localStorage.acceptDelete =
@@ -219,6 +219,9 @@ class Game extends React.Component {
         this.socket.on("ping", (id) => {
             this.socket.emit("pong", id);
         });
+        this.socket.on("message", (text) => {
+            popup.alert({content: text});
+        })
         window.socket.on("disconnect", (event) => {
             this.setState({
                 inited: false,
@@ -245,8 +248,10 @@ class Game extends React.Component {
         this.socket.emit("players-join", seat);
     }
 
-    handleTakeCharacter(char) {
-        this.socket.emit("take-character", char);
+    handleActionCharacter(char) {
+        this.state.player.action === 'choose' ?
+            this.socket.emit("take-character", char) :
+            this.socket.emit("discard-character", char);
     }
 
     handleTakeResource(res) {
@@ -356,7 +361,7 @@ class Game extends React.Component {
             data = this.state,
             isHost = data.hostId === data.userId,
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
-            notEnoughPlayers = data.phase === 0 && playerCount < 3;
+            notEnoughPlayers = data.phase === 0 && playerCount < 2;
 
         if (this.state.disconnected)
             return (<div
@@ -389,10 +394,13 @@ class Game extends React.Component {
                         </div>
                         : null}
                     {data.player && data.currentPlayer == data.userSlot ?
-                        <div className="action-section">
-                            {data.phase == 1 ?
-                                <div className="choose-character">
-                                    <p>Choose character:</p>
+                        <div className="action-section"> 
+                            {data.phase == 1 ? 
+                                <div className={
+                                        "choose-character"
+                                        + (data.player.action === "discard" ? " discard" : "")
+                                    }>
+                                    <p>{data.player.action === "discard" ? "Discard" : "Choose"} character:</p>
                                     <div className="cards-list">
                                         {data.player && data.player.choose && data.player.choose.map((card, id) => (
                                             <Card key={id} card={card} type="character" game={this}

@@ -79,7 +79,7 @@ function init(wsServer, path) {
                 },
                 startGame = () => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
-                    if (state.playersCount > 3) {
+                    if (state.playersCount > 1) {
                         room.teamsLocked = true;
                         state.districtDeck = utils.createDeck();
                         room.playerSlots.forEach((player, slot) => {
@@ -99,6 +99,7 @@ function init(wsServer, path) {
                         room.king = getRandomPlayer();
                         room.ender = null;
                         room.winnerPlayer = null;
+                        state.maxDistricts = state.playersCount < 4 ? 8 : 7;
                         newRound();
                     }
                 },
@@ -108,7 +109,7 @@ function init(wsServer, path) {
                     state.characterDeck = [1, 2, 3, 4, 5, 6, 7, 8];
                     room.characterFace = [];
 
-                    let discard = state.playersCount === 7 ? 0 : 6 - state.playersCount;
+                    let discard = state.playersCount === 7 || state.playersCount < 4 ? 0 : 6 - state.playersCount;
                     while (room.characterFace.length < discard) {
                         let rnd = Math.floor(Math.random() * state.characterDeck.length);
                         if (state.characterDeck[rnd] !== 4)
@@ -120,14 +121,15 @@ function init(wsServer, path) {
                     state.discarded = state.characterDeck.splice(rnd, 1);
 
                     Object.keys(players).forEach(slot => {
-                        players[slot].character = null;
-                        room.playerCharacter[slot] = null;
+                        players[slot].character = [];
+                        room.playerCharacter[slot] = [];
                     });
                     state.characterRoles = {};
 
                     room.assassined = null;
                     room.robbed = null;
                     room.currentPlayer = room.king;
+                    players[room.currentPlayer].action = 'choose';
                     players[room.currentPlayer].choose = state.characterDeck;
                     update();
                     updateState();
@@ -138,6 +140,7 @@ function init(wsServer, path) {
                     sendStateSlot(room.currentPlayer);
                     if (state.characterDeck.length > 1) {
                         room.currentPlayer = getNextPlayer();
+                        players[room.currentPlayer].action = 'choose';
                         players[room.currentPlayer].choose = state.characterDeck;
                         update();
                         sendStateSlot(room.currentPlayer);
@@ -145,13 +148,41 @@ function init(wsServer, path) {
                         state.characterDeck.push(state.discarded).sort((a, b) => a - b);
                         state.discarded = null;
                         room.currentPlayer = getNextPlayer();
+                        players[room.currentPlayer].action = 'choose';
                         players[room.currentPlayer].choose = state.characterDeck;
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else {
                         room.phase = 2;
                         nextCharacter();
-                        return;
+                    }
+                },
+                nextChoose2 = () => {
+                    switch (state.characterDeck.length) {
+                        case 6:
+                        case 4:
+                        case 2:
+                            players[room.currentPlayer].action = null;
+                            players[room.currentPlayer].choose = null;
+                            sendStateSlot(room.currentPlayer);
+                            room.currentPlayer = getNextPlayer();
+                            players[room.currentPlayer].action = 'choose';
+                            players[room.currentPlayer].choose = state.characterDeck;
+                            update();
+                            sendStateSlot(room.currentPlayer);
+                            break;
+                        case 5:
+                        case 3:
+                            players[room.currentPlayer].action = 'discard';
+                            update();
+                            sendStateSlot(room.currentPlayer);
+                            break;
+                        case 1:
+                            players[room.currentPlayer].action = null;
+                            players[room.currentPlayer].choose = null;
+                            sendStateSlot(room.currentPlayer);
+                            room.phase = 2;
+                            nextCharacter();
                     }
                 },
                 nextCharacter = () => {
@@ -159,12 +190,14 @@ function init(wsServer, path) {
                     if (room.currentCharacter > 8) return endRound();
                     room.currentPlayer = state.characterRoles[room.currentCharacter];
                     if (room.currentPlayer == undefined || room.assassined === room.currentCharacter) return nextCharacter();
-                    room.playerCharacter[room.currentPlayer] = room.currentCharacter;
+                    room.playerCharacter[room.currentPlayer][players[room.currentPlayer].character.indexOf(room.currentCharacter)] = room.currentCharacter;
 
                     if (room.robbed === room.currentCharacter) {
                         let gold = room.playerGold[room.currentPlayer];
                         room.playerGold[room.currentPlayer] = 0;
+                        countPoints(room.currentPlayer);
                         room.playerGold[state.characterRoles[2]] += gold;
+                        countPoints(state.characterRoles[2]);
                     }
 
                     room.buildDistincts = 1;
@@ -196,11 +229,13 @@ function init(wsServer, path) {
                             break;
                         case 6:
                             room.playerGold[room.currentPlayer] += 1;
+                            countPoints(room.currentPlayer);
                             break;
                         case 7:
                             room.playerHand[room.currentPlayer] += 2;
                             players[room.currentPlayer].hand.push(...state.districtDeck.splice(0, 2));
                             room.buildDistincts = 3;
+                            countPoints(room.currentPlayer);
                             break;
                         case 8:
                             players[room.currentPlayer].action = 'warlord-action';
@@ -212,7 +247,7 @@ function init(wsServer, path) {
                 },
                 endRound = () => {
                     room.king = '4' in state.characterRoles ? state.characterRoles[4] : room.king;
-                    if (room.ender != null) return endGame();
+                    if (room.ender !== null) return endGame();
                     newRound();
                 },
                 endGame = () => {
@@ -220,7 +255,7 @@ function init(wsServer, path) {
                     Object.keys(players).forEach(slot => countPoints(slot));
                     let maxPoints = 0;
                     for (let i = 1; i <= 8; i++) {
-                        if (state.characterRoles[i])
+                        if (state.characterRoles[i] !== null)
                             if (room.playerScore[state.characterRoles[i]] >= maxPoints) {
                                 maxPoints = room.playerScore[state.characterRoles[i]]
                                 room.winnerPlayer = state.characterRoles[i];
@@ -240,7 +275,7 @@ function init(wsServer, path) {
                     room.playerScore[slot] = room.playerDistricts[slot].map(card => utils.distincts[card].cost).reduce((a, b) => a + b, 0);
                     room.playerScore[slot] += 3 * isComboCity(slot);
                     if (room.ender === slot) room.playerScore[slot] += 2;
-                    if (room.playerDistricts[slot].length > 6) room.playerScore[slot] += 2;
+                    if (room.playerDistricts[slot].length >= state.maxDistricts) room.playerScore[slot] += 2;
 
                     room.playerScore[slot] += 2 * include(slot, 27);
                     room.playerScore[slot] += room.playerHand[slot] * include(slot, 24);
@@ -293,12 +328,18 @@ function init(wsServer, path) {
             this.userEvent = userEvent;
             this.slotEventHandlers = {
                 "take-character": (slot, value) => {
-                    if (room.phase === 1 && slot === room.currentPlayer && ~state.characterDeck[value]) {
+                    if (room.phase === 1 && slot === room.currentPlayer && players[slot].action === 'choose' && ~state.characterDeck[value]) {
                         let role = state.characterDeck.splice(value, 1)[0];
-                        players[slot].character = role;
-                        room.playerCharacter[slot] = 0;
+                        players[slot].character.push(role);
+                        room.playerCharacter[slot].push(0);
                         state.characterRoles[role] = slot;
-                        nextChoose();
+                        state.playersCount == 2 ? nextChoose2() : nextChoose();
+                    }
+                },
+                "discard-character": (slot, value) => {
+                    if (room.phase === 1 && slot === room.currentPlayer && players[slot].action === 'discard' && ~state.characterDeck[value]) {
+                        state.characterDeck.splice(value, 1)[0];
+                        nextChoose2();
                     }
                 },
                 "take-resources": (slot, res) => {
@@ -353,7 +394,7 @@ function init(wsServer, path) {
                         room.playerGold[slot] -= cost;
                         room.playerDistricts[slot].push(...players[slot].hand.splice(card, 1));
                         room.playerHand[slot] -= 1;
-                        if (!room.ender && room.playerDistricts[slot].length >= 7)
+                        if (room.ender === null && room.playerDistricts[slot].length >= state.maxDistricts)
                             room.ender = slot;
                         countPoints(slot);
                         update();
@@ -399,7 +440,7 @@ function init(wsServer, path) {
                     if (room.phase === 2 && players[slot].action === 'warlord-action' && room.playerDistricts[slot_d][card]) {
                         if (state.characterRoles[5] === slot_d && room.assassined !== 5)
                             return sendSlot(slot, "message", 'You cannot use ability on the Bishop\'s districts.');
-                        if (room.playerDistricts[slot_d].length >= 7)
+                        if (room.playerDistricts[slot_d].length >= state.maxDistricts)
                             return sendSlot(slot, "message", 'You cannot use ability on the completed city.');
                         const building = room.playerDistricts[slot_d][card];
                         if (building === 19)
