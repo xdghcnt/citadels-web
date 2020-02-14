@@ -146,7 +146,8 @@ h1, h2, h3 {
     position: absolute;
     bottom: 27px;
     width: 75px;
-    left: 32px;
+    left: 50%;
+    margin-left: -37.5px;
 }
 
 .resources {
@@ -448,4 +449,8 @@ body {
 
 .profile-bg i, .districts-bg i {
     font-size: 80px;
+}
+
+.discard .cards-list {
+    opacity: 0.5;
 }

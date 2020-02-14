@@ -87,13 +87,13 @@ class Card extends React.Component {
             noZoom = this.props.noZoom;
         return (
             <div className={`${type} card-item ${noZoom ? "no-zoom" : ""}`}
-                 style={{"background-position": `-${(card - 1) * 130}px 0px`}}
+                 style={{"background-position": `-${card * 130}px 0px`}}
                  onMouseDown={(e) => game.handleCardPress(e)}
                  onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>
                 {!noZoom ? (<div className="card-zoom-button material-icons"
                                  onMouseDown={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
                 {!noZoom ? (<div className={`card-item-zoomed ${type}`}
-                                 style={{"background-position": `-${(card - 1) * 430}px 0px`}}/>) : ""}
+                                 style={{"background-position": `-${card * 430}px 0px`}}/>) : ""}
             </div>
         );
     }
@@ -130,18 +130,16 @@ class PlayerSlot extends React.Component {
                         </div>
                     </div>
                     <div className="characters-list">
-                        {character != null ? 
+                        {character && character.map((card, id) => (
                             <div className="character-container">
-                                {character.map((card, id) => (
-                                    <Card key={id} card={card} type="character" game={game} />
-                                ))}
-                                {magicianAction ?
-                                    <button onClick={() => game.handleMagician(slot)}>
-                                        {slot == data.userSlot ? 'Discard' : 'Exchange'}
-                                    </button>
-                                    : null}
+                                <Card key={id} card={card} type="character" game={game} />
                             </div>
-                            : null}
+                        ))}
+                        {magicianAction ?
+                            <button onClick={() => game.handleMagician(slot)}>
+                                {slot == data.userSlot ? 'Discard' : 'Exchange'}
+                            </button>
+                        : null}
                     </div>
                     {player ?
                         <div className='resources'>
@@ -404,7 +402,7 @@ class Game extends React.Component {
                                     <div className="cards-list">
                                         {data.player && data.player.choose && data.player.choose.map((card, id) => (
                                             <Card key={id} card={card} type="character" game={this}
-                                                  onClick={() => this.handleTakeCharacter(id)}/>
+                                                  onClick={() => this.handleActionCharacter(id)}/>
                                         ))}
                                     </div>
                                 </div>
