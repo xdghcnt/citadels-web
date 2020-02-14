@@ -247,6 +247,18 @@ function init(wsServer, path) {
                     room.playerScore[slot] += room.playerGold[slot] * include(slot, 25);
                 },
                 include = (slot, card) => room.playerDistricts[slot].includes(card),
+                removePlayer = (playerId) => {
+                    if (room.spectators.has(playerId)) {
+                        this.emit("user-kicked", playerId);
+                        room.spectators.delete(playerId);
+                    } else {
+                        room.playerSlots[room.playerSlots.indexOf(playerId)] = null;
+                        if (room.onlinePlayers.has(playerId)) {
+                            room.spectators.add(playerId);
+                            sendState(playerId);
+                        }
+                    }
+                },
                 userJoin = (data) => {
                     const user = data.userId;
                     if (!room.playerNames[user])
@@ -447,6 +459,18 @@ function init(wsServer, path) {
                         update();
                         sendState(user);
                     }
+                },
+                "remove-player": (user, playerId) => {
+                    if (room.hostId === user && playerId)
+                        removePlayer(playerId);
+                    update();
+                },
+                "give-host": (user, playerId) => {
+                    if (room.hostId === user && playerId) {
+                        room.hostId = playerId;
+                        this.emit("host-changed", user, playerId);
+                    }
+                    update();
                 },
                 "change-name": (user, value) => {
                     if (value)

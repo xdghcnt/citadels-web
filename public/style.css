@@ -42,13 +42,6 @@ h1, h2, h3 {
 }
 
 
-
-
-
-
-
-
-
 .cards-list {
     display: flex;
 }
@@ -77,24 +70,26 @@ h1, h2, h3 {
 
 
 .character-section .cards-list .character {
-    height: 15px;
+    height: 23px;
 }
 
 .player-slot {
     display: flex;
-    border: solid black 2px;
-    height: 190px;
-    margin: 2px;
+    height: 273px;
+    margin: 5px;
+    background: #ffffffab;
+    box-shadow: 0 0 6px 1px black;
 }
 
 .profile {
     display: flex;
     flex-direction: column;
-    border-right: solid black 1px;
+    border-right: solid #737373 1px;
+    position: relative;
 }
 
 .player-slot.my-turn {
-    border: solid red 2px;
+    background: #ffc0c0cc;
 }
 
 .player-slot.winner {
@@ -106,10 +101,9 @@ h1, h2, h3 {
 }
 
 .profile-name {
-    margin: 3px;
     font-size: 16px;
-    width: 140px;
     color: white;
+    width: 100%;
 }
 
 .player-slot-0 .profile-name {
@@ -142,19 +136,23 @@ h1, h2, h3 {
 
 .characters-list {
     display: flex;
-    height: 130px;
+    height: 100%;
     justify-content: center;
+    width: 145px;
+    padding: 0 5px;
 }
 
 .profile button {
-    position: relative;
-    bottom: 20px;
+    position: absolute;
+    bottom: 27px;
     width: 75px;
+    left: 32px;
 }
 
 .resources {
-    height: 40px;
+    height: 34px;
     display: flex;
+    justify-content: center;
 }
 
 .rs-block {
@@ -191,13 +189,15 @@ h1, h2, h3 {
 .districts {
     display: flex;
     flex-direction: column;
-    width: 220px;
+    width: 281px;
     justify-content: space-between;
+    position: relative;
 }
 
 .districts .cards-list {
     display: flex;
-    margin: 28px 10px 0px 10px;
+    margin: 28px 10px 0 10px;
+    justify-content: center;
 }
 
 .districts .cards-list .card:not(:first-child) {
@@ -209,12 +209,18 @@ h1, h2, h3 {
 }
 
 .districts .cards-list .card:hover {
-    border: 3px solid gold;
+    box-shadow: 0 0 4px 2px #ff9c62;
+}
+
+.districts .cards-list .zoomed .card:hover {
+    box-shadow: 0 0 4px 0 #000000;
 }
 
 .score-block {
     margin-left: 10px;
     font-weight: bold;
+    padding-bottom: 5px;
+    text-align: center;
 }
 
 .spectators-section {
@@ -258,7 +264,7 @@ h1, h2, h3 {
     z-index: 2;
 }
 
-.host-controls:hover .host-controls:focus{
+.host-controls:hover .host-controls:focus {
     display: block;
 }
 
@@ -284,57 +290,162 @@ h1, h2, h3 {
 
 .character {
     background: url('./character.png');
-    width: 75px; 
-    height: 120px;
-    background-size: 675px;
+    width: 130px;
+    height: 208px;
+    background-size: cover;
 }
 
-.character.character1 { background-position: 0 0; } 
-.character.character2 { background-position: -75px 0; } 
-.character.character3 { background-position: -150px 0; } 
-.character.character4 { background-position: -225px 0; } 
-.character.character5 { background-position: -300px 0; } 
-.character.character6 { background-position: -375px 0; } 
-.character.character7 { background-position: -450px 0; } 
-.character.character8 { background-position: -525px 0; } 
-.character.character0 { background-position: -600px 0; } 
+.character-section .character {
+    background-size: 1168px;
+}
 
 .card {
     background: url('./card.png');
-    width: 75px; height: 120px;
-    background-size: 2175px;
+    width: 130px;
+    height: 208px;
+    background-size: cover;
 }
-.card.card1 { background-position: 0 0; }
-.card.card2 { background-position: -75px 0; } 
-.card.card3 { background-position: -150px 0; }
-.card.card4 { background-position: -225px 0; } 
-.card.card5 { background-position: -300px 0; } 
-.card.card6 { background-position: -375px 0; } 
-.card.card7 { background-position: -450px 0; } 
-.card.card8 { background-position: -525px 0; } 
-.card.card9 { background-position: -600px 0; } 
-.card.card10 { background-position: -675px 0; } 
-.card.card11 { background-position: -750px 0; } 
-.card.card12 { background-position: -825px 0; } 
-.card.card13 { background-position: -900px 0; }
-.card.card14 { background-position: -975px 0; } 
-.card.card15 { background-position: -1050px 0; } 
-.card.card16 { background-position: -1125px 0; } 
-.card.card17 { background-position: -1200px 0; } 
-
-.card.card18 { background-position: -1275px 0; } 
-.card.card19 { background-position: -1350px 0; } 
-.card.card20 { background-position: -1425px 0; } 
-.card.card21 { background-position: -1500px 0; } 
-.card.card22 { background-position: -1575px 0; } 
-.card.card23 { background-position: -1650px 0; }
-.card.card24 { background-position: -1725px 0; } 
-.card.card25 { background-position: -1800px 0; } 
-.card.card26 { background-position: -1875px 0; } 
-.card.card27 { background-position: -1950px 0; } 
-.card.card28 { background-position: -2025px 0; }
-.card.card29 { background-position: -2100px 0; }  
 
 .districts .card:hover {
     z-index: 1;
+}
+
+.players-section {
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: center;
+}
+
+body {
+    background: url(./bg.jpg);
+    background-repeat: no-repeat;
+    background-size: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.game {
+    background: #dcdcdc96;
+    padding: 23px 0;
+}
+
+.join-slot-button {
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.character-section {
+    margin: -5px;
+}
+
+.card-item, .card-item-zoomed {
+    border-radius: 8px;
+    box-shadow: 0 0 4px 0 #000000;
+    border: 1px solid black;
+    position: relative;
+}
+
+.card-item-zoomed {
+    display: none;
+    width: 430px;
+    height: 688px;
+}
+
+.card-item.zoomed {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #00000061;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 !important;
+}
+
+.card-item.zoomed .card-item-zoomed {
+    display: block;
+}
+
+.card-item.zoomed .card-zoom-button {
+    display: none;
+}
+
+.character-section .cards-list .character {
+    border-radius: 0;
+}
+
+.character-section .cards-list, .hand-section .cards-list, .action-section .cards-list {
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
+}
+
+.card-zoom-button {
+    visibility: hidden;
+}
+
+.card-item:hover .card-zoom-button {
+    visibility: visible;
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    right: 0;
+    margin: 3px 5px;
+    font-size: 23px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #edc36b;
+    text-shadow: 0px 2px 1px black;
+    user-select: none;
+}
+
+.character-container {
+    margin: 0 2px;
+}
+
+.kicked {
+    background: #ffffffbf;
+    padding: 13px 25px;
+}
+
+.player-host-controls {
+    margin-left: 5px;
+    display: none;
+}
+
+.player:hover .player-host-controls, .player:focus .player-host-controls {
+    display: inline-block;
+}
+
+.host-button {
+    font-size: 16px;
+    cursor: pointer;
+    vertical-align: text-top;
+}
+
+.game.double-roles .characters-list {
+    width: 290px;
+}
+
+.profile-bg, .districts-bg {
+    position: absolute;
+    bottom: 0;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #00000030;
+    pointer-events: none;
+}
+
+.profile-bg i, .districts-bg i {
+    font-size: 80px;
 }
