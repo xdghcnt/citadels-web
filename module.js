@@ -90,7 +90,7 @@ function init(wsServer, path) {
                                 room.playerGold[slot] = 2;
                                 room.playerHand[slot] = 4;
                                 room.playerDistricts[slot] = [];
-                                room.playerCharacter[slot] = null;
+                                room.playerCharacter[slot] = [];
                                 room.playerScore[slot] = 0;
                             } else
                                 delete players[slot];
@@ -252,7 +252,11 @@ function init(wsServer, path) {
                 },
                 endGame = () => {
                     room.currentPlayer = null;
-                    Object.keys(players).forEach(slot => countPoints(slot));
+                    Object.keys(players).forEach(slot => {
+                        countPoints(slot);
+                        players[slot].character = [];
+                        room.playerCharacter[slot] = [];
+                    });
                     let maxPoints = 0;
                     for (let i = 1; i <= 8; i++) {
                         if (state.characterRoles[i] !== null)
@@ -263,6 +267,7 @@ function init(wsServer, path) {
                     }
                     room.phase = 0;
                     update();
+                    updateState();
                 },
                 isComboCity = (slot) => {
                     let type = room.playerDistricts[slot].map(card => utils.distincts[card].type);
