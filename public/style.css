@@ -93,7 +93,7 @@ h1, h2, h3 {
 }
 
 .player-slot.winner {
-    border: solid gold 2px;
+    background: #ffd97ac4;
 }
 
 .profile-head {
@@ -455,4 +455,8 @@ body {
 
 .discard .cards-list {
     opacity: 0.5;
+}
+
+.game-end .hand-section {
+    display: none;   
 }

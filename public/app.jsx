@@ -377,7 +377,8 @@ class Game extends React.Component {
                     .map((value, slot) => !data.teamsLocked ? slot : value);
             return (
                 <div
-                    className={`game ${(data.phase > 0 && playerCount <= 3) ? "double-roles" : ""}`}
+                    className={`game ${(data.phase > 0 && playerCount <= 3) ? "double-roles" : ""} ${data.winnerPlayer != null ? "game-end
+ : ""}`}
                     onMouseUp={(evt) => this.handleBodyRelease(evt)}>
                     {data.phase != 0 ?
                         <div className="character-section">
