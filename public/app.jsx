@@ -90,9 +90,9 @@ class Card extends React.Component {
                  style={{"background-position": `-${card * 130}px 0px`}}
                  onMouseDown={(e) => game.handleCardPress(e)}
                  onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>
-                {!noZoom ? (<div className="card-zoom-button material-icons"
+                {!noZoom && card ? (<div className="card-zoom-button material-icons"
                                  onMouseDown={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
-                {!noZoom ? (<div className={`card-item-zoomed ${type}`}
+                {!noZoom && card ? (<div className={`card-item-zoomed ${type}`}
                                  style={{"background-position": `-${card * 430}px 0px`}}/>) : ""}
             </div>
         );
@@ -352,10 +352,6 @@ class Game extends React.Component {
         evt.stopPropagation();
         popup.confirm({content: `Give host ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("give-host", id));
     }
-    
-    handleTakeCharacter(char) {
-        this.socket.emit("take-character", char);
-    }
 
     render() {
         const
@@ -377,8 +373,7 @@ class Game extends React.Component {
                     .map((value, slot) => !data.teamsLocked ? slot : value);
             return (
                 <div
-                    className={`game ${(data.phase > 0 && playerCount <= 3) ? "double-roles" : ""} ${data.winnerPlayer != null ? "game-end
- : ""}`}
+                    className={`game ${(data.phase > 0 && playerCount <= 3) ? "double-roles" : ""} ${data.winnerPlayer != null ? "game-end": ""}`}
                     onMouseUp={(evt) => this.handleBodyRelease(evt)}>
                     {data.phase != 0 ?
                         <div className="character-section">

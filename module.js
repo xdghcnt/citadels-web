@@ -115,7 +115,6 @@ function init(wsServer, path) {
                         if (state.characterDeck[rnd] !== 4)
                             room.characterFace.push(...state.characterDeck.splice(rnd, 1));
                     }
-                    room.characterFace.sort((a, b) => a - b);
 
                     let rnd = Math.floor(Math.random() * state.characterDeck.length);
                     state.discarded = state.characterDeck.splice(rnd, 1);
@@ -279,7 +278,7 @@ function init(wsServer, path) {
                 countPoints = (slot) => {
                     room.playerScore[slot] = room.playerDistricts[slot].map(card => utils.distincts[card].cost).reduce((a, b) => a + b, 0);
                     room.playerScore[slot] += 3 * isComboCity(slot);
-                    if (room.ender === slot) room.playerScore[slot] += 2;
+                    if (room.ender == slot) room.playerScore[slot] += 2;
                     if (room.playerDistricts[slot].length >= state.maxDistricts) room.playerScore[slot] += 2;
 
                     room.playerScore[slot] += 2 * include(slot, 27);
