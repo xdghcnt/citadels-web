@@ -80,8 +80,15 @@ function init(wsServer, path) {
                 startGame = () => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
                     if (state.playersCount > 1) {
+                        room.playerGold = {};
+                        room.playerHand = {};
+                        room.playerDistricts = {};
+                        room.playerCharacter = {};
+                        room.playerScore = {};
                         room.teamsLocked = true;
                         state.districtDeck = utils.createDeck();
+                        if (room.winnerPlayer != null)
+                            utils.shuffle(room.playerSlots);
                         room.playerSlots.forEach((player, slot) => {
                             if (player != null) {
                                 players[slot] = {
@@ -144,7 +151,8 @@ function init(wsServer, path) {
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else if (state.playersCount === 7 && state.discarded) {
-                        state.characterDeck.push(state.discarded).sort((a, b) => a - b);
+                        state.characterDeck.push(state.discarded);
+                        state.characterDeck.sort((a, b) => a - b);
                         state.discarded = null;
                         room.currentPlayer = getNextPlayer();
                         players[room.currentPlayer].action = 'choose';
