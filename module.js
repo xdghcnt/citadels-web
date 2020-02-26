@@ -144,7 +144,8 @@ function init(wsServer, path) {
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else if (state.playersCount === 7 && state.discarded) {
-                        state.characterDeck.push(state.discarded).sort((a, b) => a - b);
+                        state.characterDeck.push(state.discarded);
+                        state.characterDeck.sort((a, b) => a - b);
                         state.discarded = null;
                         room.currentPlayer = getNextPlayer();
                         players[room.currentPlayer].action = 'choose';
