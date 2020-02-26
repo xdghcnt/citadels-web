@@ -80,8 +80,15 @@ function init(wsServer, path) {
                 startGame = () => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
                     if (state.playersCount > 1) {
+                        room.playerGold = {};
+                        room.playerHand = {};
+                        room.playerDistricts = {};
+                        room.playerCharacter = {};
+                        room.playerScore = {};
                         room.teamsLocked = true;
                         state.districtDeck = utils.createDeck();
+                        if (room.winnerPlayer != null)
+                            utils.shuffle(room.playerSlots);
                         room.playerSlots.forEach((player, slot) => {
                             if (player != null) {
                                 players[slot] = {
