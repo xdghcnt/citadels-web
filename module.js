@@ -15,9 +15,9 @@ function init(wsServer, path) {
         res.sendFile(__dirname + '/public/app.html');
     });
 
-    class GameState extends EventEmitter {
+    class GameState extends wsServer.users.RoomState {
         constructor(hostId, hostData, userRegistry) {
-            super();
+            super(hostId, hostData, userRegistry);
             const room = {
                 inited: true,
                 hostId: hostId,

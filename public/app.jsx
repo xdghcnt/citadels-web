@@ -199,6 +199,7 @@ class Game extends React.Component {
         initArgs.userName = localStorage.userName;
         this.socket = window.socket.of("citadels");
         this.socket.on("state", (state) => {
+            CommonRoom.processCommonRoom(state, this.state);
             this.setState(Object.assign({
                 userId: this.userId,
                 userSlot: state.playerSlots.indexOf(this.userId)
@@ -493,6 +494,7 @@ class Game extends React.Component {
                         </div>
                         <i className="settings-hover-button material-icons">settings</i>
                     </div>
+                    <CommonRoom state={this.state} app={this}/>
                 </div>)
         } else return (<div/>);
 
