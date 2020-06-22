@@ -1,6 +1,5 @@
 function init(wsServer, path) {
     const
-        express = require('express'),
         app = wsServer.app,
         registry = wsServer.users,
         EventEmitter = require("events"),
@@ -9,7 +8,7 @@ function init(wsServer, path) {
 
     registry.handleAppPage(path, `${__dirname}/public/app.html`);
 
-    app.use("/citadels", express.static(`${__dirname}/public`));
+    app.use("/citadels", wsServer.static(`${__dirname}/public`));
 
     app.get('/', (req, res) => {
         res.sendFile(__dirname + '/public/app.html');

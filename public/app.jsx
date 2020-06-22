@@ -200,6 +200,8 @@ class Game extends React.Component {
         this.socket = window.socket.of("citadels");
         this.socket.on("state", (state) => {
             CommonRoom.processCommonRoom(state, this.state);
+            if (this.state && this.state.currentPlayer !== this.state.userSlot && state.currentPlayer === this.state.userSlot)
+                this.turnSound.play();
             this.setState(Object.assign({
                 userId: this.userId,
                 userSlot: state.playerSlots.indexOf(this.userId)
@@ -230,6 +232,8 @@ class Game extends React.Component {
         });
         document.title = `Citadels - ${initArgs.roomId}`;
         this.socket.emit("init", initArgs);
+        this.turnSound = new Audio("/citadels/chime.mp3");
+        this.turnSound.volume = 0.8;
     }
 
     constructor() {
