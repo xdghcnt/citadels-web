@@ -199,7 +199,11 @@ class Game extends React.Component {
         initArgs.userName = localStorage.userName;
         this.socket = window.socket.of("citadels");
         this.socket.on("state", (state) => {
-            CommonRoom.processCommonRoom(state, this.state);
+            CommonRoom.processCommonRoom(state, this.state, {
+                maxPlayers: 7,
+                largeImageKey: "citadels",
+                details: "Citadels"
+            });
             if (this.state && this.state.currentPlayer !== this.state.userSlot && state.currentPlayer === this.state.userSlot)
                 this.turnSound.play();
             this.setState(Object.assign({

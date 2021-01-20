@@ -18,6 +18,7 @@ function init(wsServer, path) {
         constructor(hostId, hostData, userRegistry) {
             super(hostId, hostData, userRegistry);
             const room = {
+                ...this.room,
                 inited: true,
                 hostId: hostId,
                 playerSlots: Array(7).fill(null),
@@ -484,6 +485,7 @@ function init(wsServer, path) {
                 }
             };
             this.userEventHandlers = {
+                ...this.eventHandlers,
                 "start-game": (user) => {
                     if (user === room.hostId)
                         startGame();
