@@ -468,7 +468,7 @@ class Game extends React.Component {
                                         + (data.player.action === "discard" ? " discard" : "")
                                     }>
                                         <div
-                                            className="status-text">{data.player.action === "discard" ? "Discard" : "Choose"} character:
+                                            className="status-text">{data.player.action === "discard" ? "Discard" : "Choose"} character
                                         </div>
                                         <div className="cards-list">
                                             {data.player && data.player.choose && data.player.choose.map((card, id) => (
@@ -480,7 +480,7 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && data.player.action === 'assassin-action' ?
                                     <div className="choose-character">
-                                        <p className="status-text">Choose character to assassinate:</p>
+                                        <p className="status-text">Choose character to assassinate</p>
                                         <div className="cards-list">
                                             {[2, 3, 4, 5, 6, 7, 8].filter(id => !~data.characterFace.indexOf(id)).map((card, id) => (
                                                 <Card key={id} card={card} type="character" game={this}
@@ -491,7 +491,7 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && data.player.action === 'thief-action' ?
                                     <div className="status-text" className="choose-character">
-                                        <p className="status-text" className="status-text">Choose character to rob:</p>
+                                        <p className="status-text" className="status-text">Choose character to rob</p>
                                         <div className="cards-list">
                                             {[3, 4, 5, 6, 7, 8].filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id))
                                                 .map((card, id) => (
@@ -517,7 +517,7 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 3 ?
                                     <div className="choose-card">
-                                        <p className="status-text">Choose card:</p>
+                                        <p className="status-text">Choose card</p>
                                         <div className="cards-list">
                                             {data.player && data.player.choose && data.player.choose.map((card, id) => (
                                                 <Card key={id} card={card} type="card" game={this}

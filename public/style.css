@@ -331,7 +331,7 @@ body {
 .game {
     background: #dcdcdc96;
     padding: 23px 0;
-    padding-bottom: 229px;
+    padding-bottom: 255px;
 }
 
 .join-slot-button {
@@ -536,15 +536,18 @@ button {
     padding: 3px;
     color: black;
     font-weight: 400;
+    width: 100%;
+    text-align: center;
 }
 
 .action-button {
     position: absolute;
-    top: -23px;
+    top: -26px;
     padding: 6px 2px;
     left: 0;
     width: 100%;
     justify-content: center;
+    background: #0000002e;
     display: flex;
 }
 
