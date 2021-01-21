@@ -391,7 +391,7 @@ class Game extends React.Component {
                 || data.phase == 3 || data.phase === 2 && (data.player.action === 'assassin-action' || data.player.action === 'thief-action'));
             return (
                 <div
-                    className={`game ${(data.phase > 0 && Object.keys(data.playerSlots).length <= 3)
+                    className={`game ${(data.phase > 0 && Object.keys(data.playerCharacter).length <= 3)
                         ? "double-roles" : ""} ${data.winnerPlayer != null ? "game-end" : ""}`}
                     onMouseUp={(evt) => this.handleBodyRelease(evt)}>
                     {data.phase !== 0 ?

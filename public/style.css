@@ -62,7 +62,7 @@ h1, h2, h3 {
     text-align: center;
     color: red;
     position: absolute;
-    left: 4px;
+    left: 6px;
     z-index: 1;
     top: 18px;
 }
@@ -570,6 +570,6 @@ button {
 }
 
 .status.robbed {
-    color: #ff9b08 !important;
+    color: #ffce07 !important;
     right: 6px;
 }
