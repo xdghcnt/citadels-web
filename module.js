@@ -440,7 +440,7 @@ function init(wsServer, path) {
                     }
                 },
                 "build": (slot, card) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && room.buildDistincts && ~players[slot].hand[card]) {
+                    if (room.phase === 2 && slot === room.currentPlayer && (room.buildDistincts || building === "stable") && ~players[slot].hand[card]) {
                         const building = players[slot].hand[card];
                         if (building === "monument" && room.playerDistricts[slot].length + 2 >= state.maxDistricts)
                             return sendSlot(slot, "message", "You can't build Monument as last building");

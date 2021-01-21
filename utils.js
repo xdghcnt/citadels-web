@@ -65,11 +65,13 @@ const shuffle = array => {
 }
 
 const createDeck = () => {
-    const deck = Array();
+    const deck = Array(), deck9 = Array();
     for (key in distincts) {
-        for (i = 0; i < distincts[key].quantity; i++) deck.push(key)
+        for (i = 0; i < distincts[key].quantity; i++) 
+            distincts[key].type == 9 ? deck9.push(key) : deck.push(key)
     }
-    return shuffle(deck);
+    shuffle(deck9).splice(14);
+    return shuffle(deck.concat(...deck9));
 }
 
 module.exports = {
