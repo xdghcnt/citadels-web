@@ -479,13 +479,14 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
-                "exchange-hand": (slot, slot_d) => {
+                "exchange-hand": (slot, slot_d, cards) => {
                     if (room.phase === 2 && players[slot].action === 'magician-action' && players[slot_d]) {
                         players[slot].action = null;
                         if (slot_d === slot) {
-                            let size = players[slot].hand.length;
-                            state.districtDeck.push(...players[slot].hand.splice(0));
-                            players[slot].hand = state.districtDeck.splice(0, size);
+                            if (!cards.length) return players[slot].action = 'magician-action'; 
+                            let _cards = cards.sort((a, b) => b - a);
+                            for (let key in _cards) state.districtDeck.push(...players[slot].hand.splice(_cards[key], 1));
+                            players[slot].hand.push(...state.districtDeck.splice(0, _cards.length));
                             sendStateSlot(slot);
                         } else {
                             [players[slot].hand, players[slot_d].hand] = [players[slot_d].hand, players[slot].hand];
