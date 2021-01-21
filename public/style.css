@@ -399,14 +399,14 @@ body {
     display: none;
 }
 
-.card-item.card-chosen {
-    border: 3px solid red;
-}
-
 .character-section .cards-list .character {
     border-radius: 0;
     border: navajowhite;
     position: static;
+}
+
+.character-section .card-item.card-chosen {
+    border: 3px solid red;
 }
 
 .character-section .cards-list, .hand-section .cards-list, .action-section .cards-list {

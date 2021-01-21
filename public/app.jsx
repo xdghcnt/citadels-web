@@ -92,9 +92,13 @@ class Card extends React.Component {
                     ? (card ? `${card}_1` : "card_back")
                     : card || "card_back"
             }.jpg)`,
-            cardChosen = this.props.game.state.cardChosen.includes(this.props.id);
+            cardChosen = game.state.cardChosen.includes(this.props.id),
+            currentCharacter = game.state.currentCharacter === card;
         return (
-            <div className={`${type} card-item ${noZoom ? "no-zoom" : ""} ${cardChosen ? "card-chosen" : ""}`}
+            <div className={cs(type, "card-item", {
+                "no-zoom": noZoom,
+                "card-chosen": cardChosen || currentCharacter
+            })}
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => game.handleCardPress(e)}
                  onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>
@@ -557,7 +561,7 @@ class Game extends React.Component {
                                     <div>
                                         <div className="action-button">
                                             <button onClick={() => this.handleMagicianOff()}>Cancel Discard</button>
-                                            <button onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Send discard</button>
+                                            <button onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Accept discard</button>
                                         </div>
                                         <div className="hand-section">
                                             <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
