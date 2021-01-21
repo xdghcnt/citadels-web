@@ -147,11 +147,11 @@ class PlayerSlot extends React.Component {
                                 <Card key={id} card={card} type="character" game={game}/>
                             </div>
                         ))}
-                        {magicianAction && slot != data.userSlot?
+                        {magicianAction && slot != data.userSlot ?
                             <button onClick={() => game.handleMagician(slot, [])}>Exchange</button>
                             : null}
                     </div>
-                    {player ?
+                    {data.playerCharacter[slot] ?
                         <div className='resources'>
                             <div className="rs-block gold">
                                 <div className="resource-count">{data.playerGold[slot] || 0}</div>
@@ -306,14 +306,14 @@ class Game extends React.Component {
         this.setState(Object.assign(this.state, {
             userAction: 'magician',
             cardChosen: []
-        })); 
+        }));
     }
 
     handleMagicianOff() {
         this.setState(Object.assign(this.state, {
             userAction: null,
             cardChosen: []
-        })); 
+        }));
     }
 
     handleMagicalCard(id) {
@@ -321,7 +321,7 @@ class Game extends React.Component {
         _cardChosen.has(id) ? _cardChosen.delete(id) : _cardChosen.add(id);
         this.setState(Object.assign(this.state, {
             cardChosen: [..._cardChosen]
-        })); 
+        }));
     }
 
     handleDestroy(slot, card) {
@@ -335,6 +335,11 @@ class Game extends React.Component {
     handleClickTogglePause() {
         if (this.state.phase === 0 || confirm("Game will be aborted. Are you sure?"))
             this.socket.emit("start-game");
+    }
+
+    handleClickStop() {
+        if (this.state.phase === 0 || confirm("Game will be aborted. Are you sure?"))
+            this.socket.emit("abort-game");
     }
 
     handleToggleTeamLockClick() {
@@ -409,13 +414,12 @@ class Game extends React.Component {
             return (<div
                 className="kicked">Disconnected{this.state.disconnectReason ? ` (${this.state.disconnectReason})` : ""}</div>);
         else if (this.state.inited) {
-            const activeSlots = [];
-            data.playerSlots.forEach((userId, slot) => {
-                if (userId != null) activeSlots.push(slot);
-            });
             const
-                slots = (!data.teamsLocked ? data.playerSlots : activeSlots)
-                    .map((value, slot) => !data.teamsLocked ? slot : value);
+                activeSlots = Object.keys(data.playerCharacter),
+                slots = (!data.teamsLocked
+                    ? (data.phase === 0 ? data.playerSlots
+                        .map((value, slot) => !data.teamsLocked ? slot : value) : activeSlots)
+                    : activeSlots).map((n) => parseInt(n));
             const districtCardsMinimized = data.player && data.currentPlayer === data.userSlot && ((data.phase === 1)
                 || data.phase == 3 || data.phase === 2 && (data.player.action === 'assassin-action' || data.player.action === 'thief-action'));
             return (
@@ -428,7 +432,10 @@ class Game extends React.Component {
                             <div className="cards-list">
                                 {[1, 2, 3, 4, 5, 6, 7, 8].map((card, id) => (
                                     <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
-                                        <div className={cs("status", {assassined: card === data.assassined, robbed: card === data.robbed})}>
+                                        <div className={cs("status", {
+                                            assassined: card === data.assassined,
+                                            robbed: card === data.robbed
+                                        })}>
                                             {card === data.assassined ?
                                                 <svg width="485pt" height="403pt" viewBox="0 0 485 403" version="1.1"
                                                      xmlns="http://www.w3.org/2000/svg">
@@ -483,12 +490,13 @@ class Game extends React.Component {
                             <div className="hand-section">
                                 <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
                                     {data.player && data.player.hand && data.player.hand.map((card, id) => (
-                                        <Card key={id} card={card} type="card" id={id} onClick={() => this.handleBuild(id)}
+                                        <Card key={id} card={card} type="card" id={id}
+                                              onClick={() => this.handleBuild(id)}
                                               game={this}/>
                                     ))}
                                 </div>
                             </div>
-                        : null}
+                            : null}
                         {data.player && data.currentPlayer === data.userSlot ?
                             <div className="action-section">
                                 {data.phase == 1 ?
@@ -561,14 +569,18 @@ class Game extends React.Component {
                                     <div>
                                         <div className="action-button">
                                             <button onClick={() => this.handleMagicianOff()}>Cancel Discard</button>
-                                            <button onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Accept discard</button>
+                                            <button
+                                                onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Accept
+                                                discard
+                                            </button>
                                         </div>
                                         <div className="hand-section">
                                             <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
-                                            {data.player && data.player.hand && data.player.hand.map((card, id) => (
-                                            <Card key={id} card={card} type="card" id={id} onClick={() => this.handleMagicalCard(id)}
-                                              game={this}/>
-                                            ))}
+                                                {data.player && data.player.hand && data.player.hand.map((card, id) => (
+                                                    <Card key={id} card={card} type="card" id={id}
+                                                          onClick={() => this.handleMagicalCard(id)}
+                                                          game={this}/>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>
@@ -588,6 +600,9 @@ class Game extends React.Component {
                                       className="material-icons start-game settings-button">lock_outline</i>)
                                 : (<i onClick={() => this.handleToggleTeamLockClick()}
                                       className="material-icons start-game settings-button">lock_open</i>)) : ""}
+                            {(isHost && data.phase !== 0)
+                                ? (<i onClick={() => this.handleClickStop()}
+                                      className="toggle-theme material-icons settings-button">stop</i>) : ""}
                             {isHost ? (data.phase === 0
                                 ? (<i onClick={() => this.handleClickTogglePause()}
                                       title={notEnoughPlayers ? "Not enough players" : ""}

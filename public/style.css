@@ -25,7 +25,7 @@ h1, h2, h3 {
 }
 
 .player.offline {
-    color: #b1afaf;
+    text-decoration: line-through;
 }
 
 .player.offline .player-name-text {
@@ -405,8 +405,8 @@ body {
     position: static;
 }
 
-.character-section .card-item.card-chosen {
-    border: 3px solid red;
+.card.card-chosen {
+    box-shadow: 0 0 0 red;
 }
 
 .character-section .cards-list, .hand-section .cards-list, .action-section .cards-list {
