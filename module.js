@@ -113,6 +113,15 @@ function init(wsServer, path) {
                         room.ender = null;
                         room.winnerPlayer = null;
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
+
+                        room.playerDistricts[0] = ["haunted_quarter",
+                        "watchtower",
+                        "fortress",
+                        "monastery",
+                        "capitol",
+                        "manor",
+                        "manor",
+                        "well_of_wishes"]
                         newRound();
                     }
                 },
@@ -267,6 +276,7 @@ function init(wsServer, path) {
                     room.currentPlayer = null;
                     Object.keys(players).forEach(slot => {
                         countPoints(slot);
+                        if (players[slot].hand.includes("secret_vault")) room.playerScore[slot] += 3;
                         players[slot].character = [];
                         room.playerCharacter[slot] = [];
                     });
@@ -282,51 +292,39 @@ function init(wsServer, path) {
                     update();
                     updateState();
                 },
-                isComboCity = (slot) => {
-                    let type = room.playerDistricts[slot].map(card => utils.distincts[card].type);
-                    let types = new Set(type);
-                    if (types.size === 4 && include(slot, "haunted_quarter") && type.filter(type => type === 9).length > 1)
-                        return true;
-                    return types.size === 5;
-                },
                 countPoints = (slot) => {
                     room.playerScore[slot] = room.playerDistricts[slot].map(card => utils.distincts[card].cost).reduce((a, b) => a + b, 0);
-                    room.playerScore[slot] += 3 * isComboCity(slot);
                     if (room.ender == slot) room.playerScore[slot] += 2;
                     if (getDistrictsCount(slot) >= state.maxDistricts) room.playerScore[slot] += 2;
 
                     room.playerScore[slot] += 2 * include(slot, "dragon_gate");
                     room.playerScore[slot] += room.playerHand[slot] * include(slot, "map_room");
                     room.playerScore[slot] += room.playerGold[slot] * include(slot, "imperial_treasury");
+                    room.playerScore[slot] += room.playerDistricts[slot].filter(card => utils.distincts[card].cost % 2).length * include(slot, "basilica");
+                    if (include(slot, "memorial") && room.king === slot) room.playerScore[slot] += 5;
+                    
+                    let hqtypes = include(slot, "haunted_quarter") ? [4,5,6,8,9] : [9];
+                    let maxBonusPoints = 0;
 
-                    if (players[slot].hand.includes("secret_vault")) room.playerScore[slot] += 3;
-                    if (include(slot, "basilica"))
-                        room.playerScore[slot] += room.playerDistricts[slot].reduce((acc, current) => {
-                            if (utils.distincts[current].cost % 2)
-                                return acc++;
-                        }, 0);
-                    if (include(slot, "ivory_tower") && room.playerDistricts[slot].every((card) => utils.distincts[card].type !== 9 || card === "ivory_tower"))
-                        room.playerScore[slot] += 5;
-                    if (include(slot, "well_of_wishes"))
-                        room.playerScore[slot] += room.playerDistricts[slot].reduce((acc, current) => {
-                            if (utils.distincts[current].type === 9)
-                                return acc++;
-                        }, 0);
-                    if (include(slot, "memorial") && room.king === room.currentPlayer)
-                        room.playerScore[slot] += 5;
-                    if (include(slot, "capitol"))
-                        room.playerScore[slot] += room.playerDistricts[slot].reduce((acc, current, ind, arr) => {
-                            acc[utils.distincts[current].type] = acc[utils.distincts[current].type] || 0;
-                            acc[utils.distincts[current].type]++;
-                            if (ind !== arr.length - 1)
-                                return acc;
-                            else
-                                return Math.max(...Object.keys(acc).map((type) => acc[type])) >= 3;
-                        }, {});
+                    hqtypes.map(hqtype => {
+                        let acc = { 4: 0, 5: 0, 6: 0, 8: 0, 9: 0 };
+                        let bonusPoints = 0;
+                        room.playerDistricts[slot].map(card => card === "haunted_quarter" ? hqtype : utils.distincts[card].type)
+                        .reduce((acc, current) => {
+                            acc[current]++;
+                            return acc;
+                        }, acc);
+                        if (Math.min(...Object.keys(acc).map((type) => acc[type]))) bonusPoints += 3;
+                        if (include(slot, "ivory_tower") && acc[9] === 1) bonusPoints += 5;
+                        bonusPoints += acc[9] * include(slot, "well_of_wishes");
+                        if (Math.max(...Object.keys(acc).map((type) => acc[type])) >= 3) bonusPoints += 3 * include(slot, "capitol");
+                        maxBonusPoints = Math.max(maxBonusPoints, bonusPoints);
+                    })
+                    room.playerScore[slot] += maxBonusPoints;
                 },
                 getDistrictsCount = (slot) => {
                     let districtsCount = room.playerDistricts[slot].length;
-                    if (include(slot, "factory"))
+                    if (include(slot, "monument"))
                         districtsCount++;
                     return districtsCount;
                 },
@@ -440,8 +438,9 @@ function init(wsServer, path) {
                     }
                 },
                 "build": (slot, card) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && room.buildDistincts && ~players[slot].hand[card]) {
+                    if (room.phase === 2 && slot === room.currentPlayer && ~players[slot].hand[card]) {
                         const building = players[slot].hand[card];
+                        if (!(room.buildDistincts || building === "stable")) return;
                         if (building === "monument" && room.playerDistricts[slot].length + 2 >= state.maxDistricts)
                             return sendSlot(slot, "message", "You can't build Monument as last building");
                         if (building === "secret_vault")
@@ -479,13 +478,14 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
-                "exchange-hand": (slot, slot_d) => {
+                "exchange-hand": (slot, slot_d, cards) => {
                     if (room.phase === 2 && players[slot].action === 'magician-action' && players[slot_d]) {
                         players[slot].action = null;
                         if (slot_d === slot) {
-                            let size = players[slot].hand.length;
-                            state.districtDeck.push(...players[slot].hand.splice(0));
-                            players[slot].hand = state.districtDeck.splice(0, size);
+                            if (!cards.length) return players[slot].action = 'magician-action'; 
+                            let _cards = cards.sort((a, b) => b - a);
+                            for (let key in _cards) state.districtDeck.push(...players[slot].hand.splice(_cards[key], 1));
+                            players[slot].hand.push(...state.districtDeck.splice(0, _cards.length));
                             sendStateSlot(slot);
                         } else {
                             [players[slot].hand, players[slot_d].hand] = [players[slot_d].hand, players[slot].hand];

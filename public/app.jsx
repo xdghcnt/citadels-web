@@ -91,9 +91,14 @@ class Card extends React.Component {
                 isCharacter
                     ? (card ? `${card}_1` : "card_back")
                     : card || "card_back"
-            }.jpg)`;
+            }.jpg)`,
+            cardChosen = game.state.cardChosen.includes(this.props.id),
+            currentCharacter = game.state.currentCharacter === card;
         return (
-            <div className={`${type} card-item ${noZoom ? "no-zoom" : ""}`}
+            <div className={cs(type, "card-item", {
+                "no-zoom": noZoom,
+                "card-chosen": cardChosen || currentCharacter
+            })}
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => game.handleCardPress(e)}
                  onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>
@@ -142,10 +147,8 @@ class PlayerSlot extends React.Component {
                                 <Card key={id} card={card} type="character" game={game}/>
                             </div>
                         ))}
-                        {magicianAction ?
-                            <button onClick={() => game.handleMagician(slot)}>
-                                {slot == data.userSlot ? 'Discard' : 'Exchange'}
-                            </button>
+                        {magicianAction && slot != data.userSlot?
+                            <button onClick={() => game.handleMagician(slot, [])}>Exchange</button>
                             : null}
                     </div>
                     {player ?
@@ -250,7 +253,9 @@ class Game extends React.Component {
     constructor() {
         super();
         this.state = {
-            inited: false
+            inited: false,
+            userAction: null,
+            cardChosen: []
         };
     }
 
@@ -292,8 +297,31 @@ class Game extends React.Component {
         this.socket.emit("rob-character", char);
     }
 
-    handleMagician(slot) {
-        this.socket.emit('exchange-hand', slot);
+    handleMagician(slot, cards) {
+        this.socket.emit('exchange-hand', slot, cards);
+        this.handleMagicianOff();
+    }
+
+    handleMagicianOn() {
+        this.setState(Object.assign(this.state, {
+            userAction: 'magician',
+            cardChosen: []
+        })); 
+    }
+
+    handleMagicianOff() {
+        this.setState(Object.assign(this.state, {
+            userAction: null,
+            cardChosen: []
+        })); 
+    }
+
+    handleMagicalCard(id) {
+        let _cardChosen = new Set(this.state.cardChosen);
+        _cardChosen.has(id) ? _cardChosen.delete(id) : _cardChosen.add(id);
+        this.setState(Object.assign(this.state, {
+            cardChosen: [..._cardChosen]
+        })); 
     }
 
     handleDestroy(slot, card) {
@@ -374,7 +402,8 @@ class Game extends React.Component {
             data = this.state,
             isHost = data.hostId === data.userId,
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
-            notEnoughPlayers = data.phase === 0 && playerCount < 2;
+            notEnoughPlayers = data.phase === 0 && playerCount < 2,
+            magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2;
 
         if (this.state.disconnected)
             return (<div
@@ -450,16 +479,16 @@ class Game extends React.Component {
                         {slots.map((slot) => (<PlayerSlot data={data} slot={slot} game={this}/>))}
                     </div>
                     <div className="control-section">
-                        {data.player && data.player.hand ?
+                        {data.player && data.player.hand && data.userAction != 'magician' ?
                             <div className="hand-section">
                                 <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
                                     {data.player && data.player.hand && data.player.hand.map((card, id) => (
-                                        <Card key={id} card={card} type="card" onClick={() => this.handleBuild(id)}
+                                        <Card key={id} card={card} type="card" id={id} onClick={() => this.handleBuild(id)}
                                               game={this}/>
                                     ))}
                                 </div>
                             </div>
-                            : null}
+                        : null}
                         {data.player && data.currentPlayer === data.userSlot ?
                             <div className="action-section">
                                 {data.phase == 1 ?
@@ -501,7 +530,7 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
-                                {data.phase == 2 ?
+                                {data.phase == 2 && !data.userAction ?
                                     <div className="action-button">
                                         {!data.tookResource ?
                                             <button onClick={() => this.handleTakeResource('coins')}>Take 2
@@ -509,6 +538,8 @@ class Game extends React.Component {
                                         {!data.tookResource ?
                                             <button onClick={() => this.handleTakeResource('card')}>Take a
                                                 card</button> : null}
+                                        {magicianAction ?
+                                            <button onClick={() => this.handleMagicianOn()}>Discard</button> : null}
                                         {data.incomeAction ?
                                             <button onClick={() => this.handleTakeIncome()}>Take income</button> : null}
                                         {data.tookResource ?
@@ -523,6 +554,22 @@ class Game extends React.Component {
                                                 <Card key={id} card={card} type="card" game={this}
                                                       onClick={() => this.handleTakeCard(id)}/>
                                             ))}
+                                        </div>
+                                    </div>
+                                    : null}
+                                {data.userAction == 'magician' ?
+                                    <div>
+                                        <div className="action-button">
+                                            <button onClick={() => this.handleMagicianOff()}>Cancel Discard</button>
+                                            <button onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Accept discard</button>
+                                        </div>
+                                        <div className="hand-section">
+                                            <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
+                                            {data.player && data.player.hand && data.player.hand.map((card, id) => (
+                                            <Card key={id} card={card} type="card" id={id} onClick={() => this.handleMagicalCard(id)}
+                                              game={this}/>
+                                            ))}
+                                            </div>
                                         </div>
                                     </div>
                                     : null}

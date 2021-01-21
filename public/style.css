@@ -405,6 +405,10 @@ body {
     position: static;
 }
 
+.character-section .card-item.card-chosen {
+    border: 3px solid red;
+}
+
 .character-section .cards-list, .hand-section .cards-list, .action-section .cards-list {
     flex-wrap: wrap;
     width: 100%;
