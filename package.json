@@ -7,8 +7,5 @@
     "module.js",
     "utils.js",
     "public"
-  ],
-  "dependencies": {
-    "ws-server-engine": "git://github.com/xdghcnt/ws-server-engine.git"
-  }
+  ]
 }
