@@ -114,14 +114,6 @@ function init(wsServer, path) {
                         room.winnerPlayer = null;
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
 
-                        room.playerDistricts[0] = ["haunted_quarter",
-                        "watchtower",
-                        "fortress",
-                        "monastery",
-                        "capitol",
-                        "manor",
-                        "manor",
-                        "well_of_wishes"]
                         newRound();
                     }
                 },
@@ -539,6 +531,10 @@ function init(wsServer, path) {
                 "start-game": (user) => {
                     if (user === room.hostId)
                         startGame();
+                },
+                "abort-game": (user) => {
+                    if (user === room.hostId)
+                        endGame();
                 },
                 "toggle-lock": (user) => {
                     if (user === room.hostId)
