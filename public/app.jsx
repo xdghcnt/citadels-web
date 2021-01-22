@@ -93,11 +93,13 @@ class Card extends React.Component {
                     : card || "card_back"
             }.jpg)`,
             cardChosen = game.state.cardChosen.includes(this.props.id),
-            currentCharacter = game.state.currentCharacter === card;
+            currentCharacter = game.state.currentCharacter === card,
+            isSecretVault = card === "secret_vault";
         return (
             <div className={cs(type, "card-item", {
                 "no-zoom": noZoom,
-                "card-chosen": cardChosen || currentCharacter
+                "card-chosen": cardChosen || currentCharacter,
+                "secret-vault": isSecretVault
             })}
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => game.handleCardPress(e)}
