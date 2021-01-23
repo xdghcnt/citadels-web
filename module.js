@@ -267,8 +267,11 @@ function init(wsServer, path) {
                 endGame = () => {
                     room.currentPlayer = null;
                     Object.keys(players).forEach(slot => {
-                        countPoints(slot);
-                        if (players[slot].hand.includes("secret_vault")) room.playerScore[slot] += 3;
+                        countPoints(Number(slot));
+                        if (players[slot].hand.includes("secret_vault")) {
+                            room.playerDistricts[slot].push("secret_vault");
+                            room.playerScore[slot] += 3;
+                        }
                         players[slot].character = [];
                         room.playerCharacter[slot] = [];
                     });
