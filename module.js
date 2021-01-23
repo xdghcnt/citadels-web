@@ -478,7 +478,7 @@ function init(wsServer, path) {
                     }
                 },
                 "rob-character": (slot, char) => {
-                    if (room.phase === 2 && players[slot].action === 'thief-action' && ~[3, 4, 5, 6, 7, 8].indexOf(char) && room.assassined !== char && char > 2) {
+                    if (room.phase === 2 && players[slot].action === 'thief-action' && ~room.characterInGame.indexOf(char) && room.assassined !== char && char > 2) {
                         room.robbed = char;
                         players[slot].action = null;
                         update();
