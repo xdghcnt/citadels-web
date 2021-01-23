@@ -83,6 +83,7 @@ class Card extends React.Component {
         const
             game = this.props.game,
             card = this.props.card,
+            cardType = card.type,
             type = this.props.type,
             isToken = this.props.isToken,
             noZoom = card === 0 ? true : this.props.noZoom,
@@ -90,7 +91,7 @@ class Card extends React.Component {
             backgroundImage = `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
                 isCharacter
                     ? (card ? `${card}_1` : "card_back")
-                    : card || "card_back"
+                    : cardType || "card_back"
             }.jpg)`,
             cardChosen = game.state.cardChosen.includes(this.props.id),
             currentCharacter = game.state.currentCharacter === card,
@@ -99,7 +100,8 @@ class Card extends React.Component {
             <div className={cs(type, "card-item", {
                 "no-zoom": noZoom,
                 "card-chosen": cardChosen || currentCharacter,
-                "secret-vault": isSecretVault
+                "secret-vault": isSecretVault,
+                "decoration": card.decoration
             })}
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => game.handleCardPress(e)}
@@ -175,7 +177,7 @@ class PlayerSlot extends React.Component {
                     <div className='cards-list'>
                         {districts && districts.map((card, id) => (
                             <Card key={id} card={card} type="card" game={game}
-                                  onClick={() => game.handleDestroy(slot, id)}/>
+                                  onClick={() => game.handleClickBuilding(slot, id)}/>
                         ))}
                     </div>
                     {score ?
@@ -326,8 +328,9 @@ class Game extends React.Component {
         }));
     }
 
-    handleDestroy(slot, card) {
-        this.socket.emit("destroy", slot, card);
+    handleClickBuilding(slot, card) {
+        if (this.state.player.action == 'warlord-action') this.socket.emit("destroy", slot, card);
+        if (this.state.player.action == 'artist-action') this.socket.emit("beautify", slot, card);
     }
 
     handleEndTurn() {
@@ -432,7 +435,7 @@ class Game extends React.Component {
                     {data.phase !== 0 ?
                         <div className="character-section">
                             <div className="cards-list">
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map((card, id) => (
+                                {data.characterInGame.map((card, id) => (
                                     <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
                                         <div className={cs("status", {
                                             assassined: card === data.assassined,
@@ -521,7 +524,7 @@ class Game extends React.Component {
                                     <div className="choose-character">
                                         <p className="status-text">Choose character to assassinate</p>
                                         <div className="cards-list">
-                                            {[2, 3, 4, 5, 6, 7, 8].filter(id => !~data.characterFace.indexOf(id)).map((card, id) => (
+                                            {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || id === 1)).map((card, id) => (
                                                 <Card key={id} card={card} type="character" game={this}
                                                       onClick={() => this.handleAssassined(card)}/>
                                             ))}
@@ -532,7 +535,7 @@ class Game extends React.Component {
                                     <div className="status-text" className="choose-character">
                                         <p className="status-text" className="status-text">Choose character to rob</p>
                                         <div className="cards-list">
-                                            {[3, 4, 5, 6, 7, 8].filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id))
+                                            {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id || id < 3))
                                                 .map((card, id) => (
                                                     <Card key={id} card={card} type="character" game={this}
                                                           onClick={() => this.handleRob(card)}/>

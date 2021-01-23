@@ -405,8 +405,12 @@ body {
     position: static;
 }
 
-.character.card-chosen {
-    box-shadow: 0 0 0 red;
+.card.card-chosen {
+    border: 1px solid red;
+}
+
+.card.decoration {
+    border: 1px solid orange;
 }
 
 .players-section .card.secret-vault.card:not(.zoomed) {
