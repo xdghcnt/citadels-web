@@ -22,7 +22,7 @@ function init(wsServer, path) {
                 ...this.room,
                 inited: true,
                 hostId: hostId,
-                playerSlots: Array(7).fill(null),
+                playerSlots: Array(8).fill(null),
                 playerNames: {},
                 onlinePlayers: new JSONSet(),
                 spectators: new JSONSet(),
@@ -113,8 +113,6 @@ function init(wsServer, path) {
                         room.ender = null;
                         room.winnerPlayer = null;
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
-                        room.characterInGame = [1, 2, 3, 4, 5, 6, 7, 8];
-                        if (state.playersCount === 3) room.characterInGame.push(9);
                         newRound();
                     }
                 },
@@ -153,7 +151,7 @@ function init(wsServer, path) {
                         let rnd = Math.floor(Math.random() * state.characterDeck.length);
                         state.characterDeck.splice(rnd, 1);
                         return nextChoose();
-                    } 
+                    }
                     players[room.currentPlayer].action = null;
                     players[room.currentPlayer].choose = null;
                     sendStateSlot(room.currentPlayer);
@@ -163,8 +161,7 @@ function init(wsServer, path) {
                         players[room.currentPlayer].choose = state.characterDeck;
                         update();
                         sendStateSlot(room.currentPlayer);
-                    } 
-                    else if (state.playersCount + 1 === room.characterInGame.length && state.discarded) {
+                    } else if (state.playersCount + 1 === room.characterInGame.length && state.discarded) {
                         state.characterDeck.push(state.discarded);
                         state.characterDeck.sort((a, b) => a - b);
                         state.discarded = null;
@@ -308,18 +305,18 @@ function init(wsServer, path) {
                     room.playerScore[slot] += room.playerGold[slot] * include(slot, "imperial_treasury");
                     room.playerScore[slot] += room.playerDistricts[slot].filter(card => getDistrictCost(card) % 2).length * include(slot, "basilica");
                     if (include(slot, "memorial") && room.king === slot) room.playerScore[slot] += 5;
-                    
-                    let hqtypes = include(slot, "haunted_quarter") ? [4,5,6,8,9] : [9];
+
+                    let hqtypes = include(slot, "haunted_quarter") ? [4, 5, 6, 8, 9] : [9];
                     let maxBonusPoints = 0;
 
                     hqtypes.map(hqtype => {
-                        let acc = { 4: 0, 5: 0, 6: 0, 8: 0, 9: 0 };
+                        let acc = {4: 0, 5: 0, 6: 0, 8: 0, 9: 0};
                         let bonusPoints = 0;
                         room.playerDistricts[slot].map(card => card.type === "haunted_quarter" ? hqtype : utils.distincts[card.type].type)
-                        .reduce((acc, current) => {
-                            acc[current]++;
-                            return acc;
-                        }, acc);
+                            .reduce((acc, current) => {
+                                acc[current]++;
+                                return acc;
+                            }, acc);
                         if (Math.min(...Object.keys(acc).map((type) => acc[type]))) bonusPoints += 3;
                         if (include(slot, "ivory_tower") && acc[9] === 1) bonusPoints += 5;
                         bonusPoints += acc[9] * include(slot, "well_of_wishes");
@@ -410,8 +407,7 @@ function init(wsServer, path) {
                             if (include(slot, "library")) {
                                 players[slot].hand.push(...cardsToTake);
                                 room.playerHand[slot] += cardsToTake.length;
-                            }
-                            else {
+                            } else {
                                 players[slot].choose = cardsToTake;
                                 room.phase = 3;
                             }
@@ -449,14 +445,14 @@ function init(wsServer, path) {
                         const building = players[slot].hand[card];
                         if (!(room.buildDistincts || building.type === "stable")) return;
                         if (building.type === "monument" && room.playerDistricts[slot].length + 2 >= state.maxDistricts)
-                            return sendSlot(slot, "message", "You can't build Monument as last building");
+                            return sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
                         if (building.type === "secret_vault")
-                            return sendSlot(slot, "message", "You can't build Secret Vault");
+                            return sendSlot(slot, "message", "Вы не можете построить Тайное убежище");
                         if (include(slot, building.type) && !include(slot, "quarry"))
-                            return sendSlot(slot, "message", 'You already have this district in city.');
+                            return sendSlot(slot, "message", 'У вас уже есть такой квартал');
                         const cost = getDistrictCost(building) - include(slot, "factory") * (utils.distincts[building.type].type === 9);
                         if (room.playerGold[slot] < cost)
-                            return sendSlot(slot, "message", `You don't have enough coins (${room.playerGold[slot]}/${cost}).`);
+                            return sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
                         if (building.type !== "stable")
                             room.buildDistincts -= 1;
                         room.playerGold[slot] -= cost;
@@ -489,7 +485,7 @@ function init(wsServer, path) {
                     if (room.phase === 2 && players[slot].action === 'magician-action' && players[slot_d]) {
                         players[slot].action = null;
                         if (slot_d === slot) {
-                            if (!cards.length) return players[slot].action = 'magician-action'; 
+                            if (!cards.length) return players[slot].action = 'magician-action';
                             let _cards = cards.sort((a, b) => b - a);
                             for (let key in _cards) state.districtDeck.push(...players[slot].hand.splice(_cards[key], 1));
                             players[slot].hand.push(...state.districtDeck.splice(0, _cards.length));
@@ -508,15 +504,15 @@ function init(wsServer, path) {
                 "destroy": (slot, slot_d, card) => {
                     if (room.phase === 2 && players[slot].action === 'warlord-action' && room.playerDistricts[slot_d][card]) {
                         if (state.characterRoles[5] === slot_d && room.assassined !== 5)
-                            return sendSlot(slot, "message", 'You cannot use ability on the Bishop\'s districts.');
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на построках Епископа');
                         if (getDistrictsCount(slot_d) >= state.maxDistricts)
-                            return sendSlot(slot, "message", 'You cannot use ability on the completed city.');
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на законченном городе');
                         const building = room.playerDistricts[slot_d][card];
                         if (building.type === "keep")
-                            return sendSlot(slot, "message", 'You cannot use ability on the Keep.');
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на Форт');
                         const cost = getDistrictCost(building) - 1 + include(slot_d, "great_wall") * (building.type !== "great_wall");
                         if (room.playerGold[slot] < cost)
-                            return sendSlot(slot, "message", `You don't have enough coins (${room.playerGold[slot]}/${cost}).`);
+                            return sendSlot(slot, "message", `Недостаточно монет ${room.playerGold[slot]}/${cost}).`);
                         players[slot].action = null;
                         room.playerGold[slot] -= cost;
                         state.districtDeck.push(...room.playerDistricts[slot_d].splice(card, 1));
@@ -527,14 +523,14 @@ function init(wsServer, path) {
                     }
                 },
                 "beautify": (slot, slot_d, card) => {
-                    if (room.phase === 2 && players[slot].action === 'artist-action' && players[slot].artistAction 
+                    if (room.phase === 2 && players[slot].action === 'artist-action' && players[slot].artistAction
                         && slot === slot_d && room.playerDistricts[slot][card] && !room.playerDistricts[slot][card].decoration) {
-                            room.playerDistricts[slot][card].decoration = true;
-                            players[slot].artistAction -= 1;
-                            room.playerGold[slot] -= 1;
-                            countPoints(slot);
-                            update();
-                            sendStateSlot(slot);
+                        room.playerDistricts[slot][card].decoration = true;
+                        players[slot].artistAction -= 1;
+                        room.playerGold[slot] -= 1;
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
                     }
                 },
                 "end-turn": (slot) => {
@@ -555,9 +551,11 @@ function init(wsServer, path) {
             };
             this.userEventHandlers = {
                 ...this.eventHandlers,
-                "start-game": (user) => {
-                    if (user === room.hostId)
+                "start-game": (user, characters) => {
+                    if (user === room.hostId && characters && characters.length) {
+                        room.characterInGame = [1, 2, 3, 4, 5, 6, 7, 8, ...(characters.includes("9_1") ? [9] : [])];
                         startGame();
+                    }
                 },
                 "abort-game": (user) => {
                     if (user === room.hostId)

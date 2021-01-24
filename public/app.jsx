@@ -21,7 +21,7 @@ class Player extends React.Component {
         return (
             <div className={
                 "player"
-                + (!~data.onlinePlayers.indexOf(id) ? " offline" : "")
+                + (!~data.onlinePlayers.indexOf(id) && hasPlayer ? " offline" : "")
                 + (id === data.userId ? " self" : "")
             }
                  onTouchStart={(e) => e.target.focus()}
@@ -68,7 +68,7 @@ class Spectators extends React.Component {
             <div
                 onClick={handleSpectatorsClick}
                 className="spectators">
-                Spectators:
+                Наблюдают:
                 {
                     data.spectators.length ? data.spectators.map(
                         (player, index) => (<Player key={index} data={data} id={player} game={game}/>)) : " ..."
@@ -90,7 +90,7 @@ class Card extends React.Component {
             isCharacter = type === "character",
             backgroundImage = `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
                 isCharacter
-                    ? (card ? `${card}_1` : "card_back")
+                    ? (card ? card : "card_back")
                     : cardType || "card_back"
             }.jpg)`,
             cardChosen = game.state.cardChosen.includes(this.props.id),
@@ -110,6 +110,7 @@ class Card extends React.Component {
                                          onMouseDown={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
                 {!noZoom && card ? (<div className={`card-item-zoomed ${type}`}
                                          style={{"background-image": backgroundImage}}/>) : ""}
+                {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
             </div>
         );
     }
@@ -129,15 +130,13 @@ class PlayerSlot extends React.Component {
             isMyTurn = slot === data.currentPlayer,
             isWinner = slot === data.winnerPlayer;
         return (
-            <div className={
-                `player-slot player-slot-${slot}`
-                + (isMyTurn ? " my-turn" : "")
-                + (isWinner ? " winner" : "")
-            }>
+            <div className={cs(`player-slot`, `player-slot-${slot}`, {
+                "my-turn": isMyTurn,
+                "winner": isWinner,
+                "hasCrown": data.king == slot
+            })}>
                 <div className="profile">
-                    <div className="profile-bg">
-                        <i className="material-icons">person</i>
-                    </div>
+                    <div className="profile-bg"/>
                     <div className='profile-head'>
                         <div className="profile-name">
                             <Player id={player} data={data} slot={slot}
@@ -148,7 +147,7 @@ class PlayerSlot extends React.Component {
                     <div className="characters-list">
                         {character && character.map((card, id) => (
                             <div className="character-container">
-                                <Card key={id} card={card} type="character" game={game}/>
+                                <Card key={id} card={`${card}_1`} type="character" game={game}/>
                             </div>
                         ))}
                         {magicianAction && slot != data.userSlot ?
@@ -171,9 +170,7 @@ class PlayerSlot extends React.Component {
 
                 </div>
                 <div className='districts'>
-                    <div className="districts-bg">
-                        <i className="material-icons">home</i>
-                    </div>
+                    <div className="districts-bg"/>
                     <div className='cards-list'>
                         {districts && districts.map((card, id) => (
                             <Card key={id} card={card} type="card" game={game}
@@ -338,8 +335,52 @@ class Game extends React.Component {
     }
 
     handleClickTogglePause() {
-        if (this.state.phase === 0 || confirm("Game will be aborted. Are you sure?"))
-            this.socket.emit("start-game");
+        if (this.state.phase === 0) {
+            const
+                playerCount = this.state.playerSlots && this.state.playerSlots.filter((slot) => slot !== null).length,
+                getNineCharacterAvailable = (set) => (playerCount === 2
+                    ? []
+                    : [`9_${set}`]),
+                getNineCharacterSelected = (set) => ([3, 8].includes(playerCount)
+                    ? [`9_${set}`]
+                    : []);
+
+            this.setState({
+                ...this.state,
+                createGamePanel: {
+                    charactersAvailable: [
+                        "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1)
+                    ],
+                    charactersSelected: [
+                        "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterSelected(1)
+                    ]
+                }
+            });
+        }
+    }
+
+    handleClickCreateGame() {
+        this.socket.emit("start-game", this.state.createGamePanel.charactersSelected);
+        this.handleClickCloseCreateGame();
+    }
+
+    handleClickCloseCreateGame() {
+        this.setState({
+            ...this.state,
+            createGamePanel: null
+        });
+    }
+
+    handleClickCharacter(set, type) {
+        const playerCount = this.state.playerSlots && this.state.playerSlots.filter((slot) => slot !== null).length;
+        if (set === 1 && type === 9 && playerCount >= 4 && playerCount <= 7) {
+            const cardInd = this.state.createGamePanel.charactersSelected.indexOf(`9_1`);
+            if (~cardInd)
+                this.state.createGamePanel.charactersSelected.splice(cardInd);
+            else
+                this.state.createGamePanel.charactersSelected.push(`9_1`);
+            this.setState(this.state);
+        }
     }
 
     handleClickStop() {
@@ -429,8 +470,11 @@ class Game extends React.Component {
                 || data.phase == 3 || data.phase === 2 && (data.player.action === 'assassin-action' || data.player.action === 'thief-action'));
             return (
                 <div
-                    className={`game ${(data.phase > 0 && Object.keys(data.playerCharacter).length <= 3)
-                        ? "double-roles" : ""} ${data.winnerPlayer != null ? "game-end" : ""}`}
+                    className={cs(`game`, {
+                        "double-roles": data.phase > 0 && Object.keys(data.playerCharacter).length <= 3,
+                        "game-end": data.winnerPlayer != null,
+                        "isPlayer": data.playerSlots.includes(data.userId) && data.phase !== 0 && data.winnerPlayer == null
+                    })}
                     onMouseUp={(evt) => this.handleBodyRelease(evt)}>
                     {data.phase !== 0 ?
                         <div className="character-section">
@@ -480,7 +524,7 @@ class Game extends React.Component {
                                                 </svg>
                                                 : null}
                                         </div>
-                                        <Card key={id} card={card} type="character" noZoom={true} game={this}
+                                        <Card key={id} card={`${card}_1`} type="character" noZoom={true} game={this}
                                               isToken={true}/>
                                     </div>
                                 ))}
@@ -514,7 +558,7 @@ class Game extends React.Component {
                                         </div>
                                         <div className="cards-list">
                                             {data.player && data.player.choose && data.player.choose.map((card, id) => (
-                                                <Card key={id} card={card} type="character" game={this}
+                                                <Card key={id} card={`${card}_1`} type="character" game={this}
                                                       onClick={() => this.handleActionCharacter(id)}/>
                                             ))}
                                         </div>
@@ -522,10 +566,10 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && data.player.action === 'assassin-action' ?
                                     <div className="choose-character">
-                                        <p className="status-text">Choose character to assassinate</p>
+                                        <p className="status-text">Выберите персонажа для убийства</p>
                                         <div className="cards-list">
                                             {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || id === 1)).map((card, id) => (
-                                                <Card key={id} card={card} type="character" game={this}
+                                                <Card key={id} card={`${card}_1`} type="character" game={this}
                                                       onClick={() => this.handleAssassined(card)}/>
                                             ))}
                                         </div>
@@ -533,11 +577,12 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && data.player.action === 'thief-action' ?
                                     <div className="status-text" className="choose-character">
-                                        <p className="status-text" className="status-text">Choose character to rob</p>
+                                        <p className="status-text" className="status-text">Выберите персонажа для
+                                            воровства</p>
                                         <div className="cards-list">
                                             {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id || id < 3))
                                                 .map((card, id) => (
-                                                    <Card key={id} card={card} type="character" game={this}
+                                                    <Card key={id} card={`${card}_1`} type="character" game={this}
                                                           onClick={() => this.handleRob(card)}/>
                                                 ))}
                                         </div>
@@ -552,16 +597,17 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleTakeResource('card')}>Take a
                                                 card</button> : null}
                                         {magicianAction ?
-                                            <button onClick={() => this.handleMagicianOn()}>Discard</button> : null}
+                                            <button onClick={() => this.handleMagicianOn()}>Сбросить</button> : null}
                                         {data.incomeAction ?
-                                            <button onClick={() => this.handleTakeIncome()}>Take income</button> : null}
+                                            <button onClick={() => this.handleTakeIncome()}>Получить
+                                                доход</button> : null}
                                         {data.tookResource ?
-                                            <button onClick={() => this.handleEndTurn()}>End turn</button> : null}
+                                            <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
                                 {data.phase == 3 ?
                                     <div className="choose-card">
-                                        <p className="status-text">Choose card</p>
+                                        <p className="status-text">Выберите карту</p>
                                         <div className="cards-list">
                                             {data.player && data.player.choose && data.player.choose.map((card, id) => (
                                                 <Card key={id} card={card} type="card" game={this}
@@ -575,8 +621,7 @@ class Game extends React.Component {
                                         <div className="action-button">
                                             <button onClick={() => this.handleMagicianOff()}>Cancel Discard</button>
                                             <button
-                                                onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Accept
-                                                discard
+                                                onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Применить
                                             </button>
                                         </div>
                                         <div className="hand-section">
@@ -598,8 +643,46 @@ class Game extends React.Component {
                     }>
                         <Spectators game={this} data={data} handleSpectatorsClick={() => this.handleSpectatorsClick()}/>
                     </div>
+                    {data.createGamePanel ?
+                        <div className="create-game-panel">
+                            <div className="create-game-panel-modal">
+                                <div className="create-game-title">
+                                    Выбор набора карт
+                                </div>
+                                <div className="characters-panel">
+                                    {Array(3).fill(null).map((_, set) =>
+                                        <>
+                                            {set === 1 ? <div className="not-implemented">В разработке</div> : ""}
+                                            <div className={cs("characters-set", {
+                                                notImplemented: set > 0
+                                            })}>
+                                                {Array(9).fill(null).map((_, type) => {
+                                                        const card = `${type + 1}_${set + 1}`;
+                                                        return <div className={cs("character-slot", {
+                                                            available: data.createGamePanel.charactersAvailable.includes(card),
+                                                            selected: data.createGamePanel.charactersSelected.includes(card)
+                                                        })}>
+                                                            <Card card={card} type="character"
+                                                                  game={this}
+                                                                  onClick={() => this.handleClickCharacter(set + 1, type + 1)}/>
+                                                        </div>;
+                                                    }
+                                                )}
+                                            </div>
+                                        </>)}
+                                </div>
+                                <div className="create-game-buttons">
+                                    <button onClick={() => this.handleClickCloseCreateGame()}>Отмена</button>
+                                    <button onClick={() => this.handleClickCreateGame()}>Создать</button>
+                                </div>
+                            </div>
+                        </div>
+                        : ""}
                     <div className="host-controls">
                         <div className="side-buttons">
+                            {this.state.userId === this.state.hostId ?
+                                <i onClick={() => this.socket.emit("set-room-mode", false)}
+                                   className="material-icons exit settings-button">store</i> : ""}
                             {isHost ? (data.teamsLocked
                                 ? (<i onClick={() => this.handleToggleTeamLockClick()}
                                       className="material-icons start-game settings-button">lock_outline</i>)

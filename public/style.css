@@ -68,7 +68,7 @@ h1, h2, h3 {
 }
 
 .character-section .cards-list .discard .character {
-    opacity: 0.2;
+    opacity: 0.3;
 }
 
 
@@ -140,6 +140,10 @@ h1, h2, h3 {
     background: #b4bf45;
 }
 
+.player-slot-7 .profile-name {
+    background: #faa8cc;
+}
+
 .characters-list {
     display: flex;
     height: 100%;
@@ -151,7 +155,7 @@ h1, h2, h3 {
 
 .profile button {
     position: absolute;
-    bottom: 27px;
+    bottom: 36px;
     width: 75px;
     left: 50%;
     margin-left: -37.5px;
@@ -168,7 +172,7 @@ h1, h2, h3 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    width: 50px;
+    width: 43px;
 }
 
 .resource-count {
@@ -176,9 +180,8 @@ h1, h2, h3 {
 }
 
 .rs-block.gold:before, .rs-block.hand:before, .profile-crown {
-    background: url('./sprite.png') no-repeat top left;
-    width: 33px;
-    height: 33px;
+    width: 25px;
+    height: 24px;
 }
 
 .rs-block.gold:before, .rs-block.hand:before {
@@ -187,11 +190,26 @@ h1, h2, h3 {
 }
 
 .rs-block.gold:before {
-    background-position: -33px 0;
+    background: url('./icons/coin.svg') no-repeat;
+    background-size: contain;
 }
 
 .rs-block.hand:before {
-    background-position: -66px 0;
+    background: url('./icons/card.svg') no-repeat;
+    background-size: contain;
+    margin-left: 9px;
+    margin-top: -1px;
+}
+
+.profile-crown:before {
+    content: '';
+    background: url('./icons/crown.svg') no-repeat;
+    background-size: contain;
+    width: 32px;
+    height: 26px;
+    display: block;
+    margin-left: 5px;
+    margin-top: 1px;
 }
 
 .districts {
@@ -237,7 +255,7 @@ h1, h2, h3 {
     position: fixed;
     top: 0;
     right: 0;
-    z-index: 1;
+    z-index: 2;
 }
 
 .spectators-section.active {
@@ -326,12 +344,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0;
 }
 
 .game {
     background: #dcdcdc96;
-    padding: 23px 0;
-    padding-bottom: 229px;
+    padding: 33px 0;
 }
 
 .join-slot-button {
@@ -342,12 +360,9 @@ body {
 .character-section {
     position: fixed;
     right: 0;
-    top: 43px;
-    z-index: 1;
-    height: 100%;
-    display: flex;
-    align-items: center;
     z-index: 2;
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 .card-item, .card-item-zoomed {
@@ -355,11 +370,11 @@ body {
     box-shadow: 0 0 4px 0 #000000;
     border: 1px solid black;
     position: relative;
+    /* filter: grayscale(1); */
 }
 
 .card-item.card {
     border-radius: 9px;
-    /* margin-left: -97px; */
 }
 
 .card-item-zoomed {
@@ -380,8 +395,8 @@ body {
     left: 0;
     right: 0;
     background: #00000061;
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
     z-index: 1;
     display: flex;
     justify-content: center;
@@ -406,11 +421,13 @@ body {
 }
 
 .card.card-chosen {
-    border: 1px solid red;
+    box-shadow: inset 0 0 8px 1px red;
+    /* border: 1px solid red; */
 }
 
 .card.decoration {
     border: 1px solid orange;
+    box-shadow: inset 0 0 8px 1px orange;
 }
 
 .players-section .card.secret-vault.card:not(.zoomed) {
@@ -486,12 +503,61 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #00000030;
+    color: #c8c5be;
     pointer-events: none;
 }
 
 .profile-bg i, .districts-bg i {
     font-size: 80px;
+}
+
+.districts-bg {
+    background-color: #00000030;
+    mask: url(./icons/castle.svg) no-repeat center center / 60px;
+    -webkit-mask: url(./icons/castle.svg) no-repeat center center / 60px;
+}
+
+.player-slot-0 .profile-bg {
+    --var-image: url(./icons/portaits/001.svg);
+}
+
+.player-slot-1 .profile-bg {
+    --var-image: url(./icons/portaits/010.svg);
+}
+
+.player-slot-2 .profile-bg {
+    --var-image: url(./icons/portaits/002.svg);
+}
+
+.player-slot-3 .profile-bg {
+    --var-image: url(./icons/portaits/006.svg);
+}
+
+.player-slot-4 .profile-bg {
+    --var-image: url(./icons/portaits/007.svg);
+}
+
+.player-slot-5 .profile-bg {
+    --var-image: url(./icons/portaits/004.svg);
+}
+
+.player-slot-6 .profile-bg {
+    --var-image: url(./icons/portaits/009.svg);
+}
+
+.player-slot-7 .profile-bg {
+    --var-image: url(./icons/portaits/005.svg);
+}
+
+.player-slot-8 .profile-bg {
+    --var-image: url(./icons/portaits/003.svg);
+}
+
+.profile-bg {
+    background-color: #00000030;
+    mask: var(--var-image) no-repeat center center / 60px;
+    -webkit-mask: var(--var-image) no-repeat center center / 60px;
+    transform: scaleX(-1);
 }
 
 .discard .cards-list {
@@ -507,12 +573,13 @@ body {
     bottom: 0;
     left: 0;
     padding: 15px 16px;
-    background: #0000001a;
-    display: flex;
+    background: linear-gradient(0, #00000085, transparent);
+    display: none;
     flex-flow: row;
     justify-content: center;
     width: 100%;
     z-index: 1;
+    /* overflow: auto; */
 }
 
 .action-section {
@@ -540,24 +607,30 @@ button {
     margin-left: -100px;
 }
 
+.cards-list.minimized .card:hover {
+    z-index: 1;
+    box-shadow: 0 0 4px 2px #ff9c62;
+}
+
 .status-text {
     position: absolute;
-    left: 9px;
+    left: 3px;
     top: -25px;
     background: #ffffff7d;
     padding: 3px;
     color: black;
     font-weight: 400;
+    z-index: 1;
 }
 
 .action-button {
     position: absolute;
-    top: -26px;
+    top: -19px;
     padding: 6px 2px;
     left: 0;
     width: 100%;
     justify-content: center;
-    background: #0000002e;
+    /* background: #0000002e; */
     display: flex;
 }
 
@@ -585,4 +658,134 @@ button {
 .status.robbed {
     color: #ffce07 !important;
     right: 6px;
+}
+
+.hasCrown .resources {
+    margin-left: -17px;
+}
+
+.game.isPlayer {
+    padding-bottom: 253px;
+}
+
+.isPlayer .control-section {
+    display: flex;
+}
+
+@media (max-width: 950px) {
+    .control-section {
+        flex-wrap: wrap;
+        position: static;
+    }
+
+    .action-section .cards-list {
+        flex-wrap: wrap;
+    }
+
+    .game.isPlayer {
+        padding-bottom: 0;
+        padding-right: 62px;
+    }
+
+    .action-button {
+        position: static;
+    }
+
+    .status-text {
+        position: static;
+    }
+}
+
+.loading-title {
+    padding: 20px;
+    background: #ffffffbf;
+}
+
+.loading-problems.active {
+    background: #ffffffbf;
+    opacity: 1;
+    margin-top: 0;
+    padding: 12px;
+}
+
+.decoration-coin {
+    position: absolute;
+    height: 23px;
+    width: 23px;
+    background: url("./icons/decoration-coin.png");
+    background-size: contain;
+    left: 2px;
+    box-shadow: 0px -1px 2px 1px #0000005c;
+    border-radius: 19px;
+    filter: grayscale(0.1);
+}
+
+.create-game-panel {
+    position: fixed;
+    background: #80808099;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.create-game-panel-modal {
+    width: 980px;
+    background: #ffffffab;
+    max-width: 100%;
+    text-align: center;
+    padding: 20px;
+    max-width: 100%;
+}
+
+.create-game-panel .character.card-item {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+.characters-set {
+    display: flex;
+}
+
+.create-game-title {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.create-game-buttons {
+    margin-top: 14px;
+}
+
+.not-implemented {
+    font-size: 17px;
+}
+
+.character-slot {
+    width: 100px;
+    height: 165px;
+    margin: 6px;
+    border: 1px solid black;
+    border-radius: 5px;
+}
+
+.character-slot.selected .character {
+    filter: none;
+}
+
+.character-slot.available .character {
+    opacity: 1;
+}
+
+.character-slot .character {
+    opacity: 0.5;
+    filter: grayscale(1);
+}
+
+.characters-set.notImplemented {
+    opacity: 1 !important;
 }
