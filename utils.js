@@ -46,12 +46,12 @@ const distincts = {
     capitol: {type: 9, cost: 5, quantity: 1},
 
     //framework: {type: 9, cost: 3, quantity: 1},
-    //arsenal: {type: 9, cost: 3, quantity: 1},
+    arsenal: {type: 9, cost: 3, quantity: 1},
     //museum: {type: 9, cost: 4, quantity: 1},
-    //forgery: {type: 9, cost: 5, quantity: 1},
+    forgery: {type: 9, cost: 5, quantity: 1},
     //laboratory: {type: 9, cost: 5, quantity: 1},
     //necropolis: {type: 9, cost: 5, quantity: 1},
-    //theater: {type: 9, cost: 6, quantity: 1},
+    theater: {type: 9, cost: 6, quantity: 1},
     //den_of_thieves: {type: 9, cost: 6, quantity: 1},
 
 };
@@ -64,12 +64,15 @@ const shuffle = array => {
     return array
 }
 
-const createDeck = () => {
-    const deck = Array(), deck9 = Array();
+const createDeck = (players) => {
+    const deck = Array();
+    let deck9 = Array();
     for (key in distincts) {
         for (i = 0; i < distincts[key].quantity; i++) 
-            distincts[key].type == 9 ? deck9.push({type: key}) : deck.push({type: key, cost: distincts[key].cost})
+            distincts[key].type == 9 ? deck9.push({type: key, cost: distincts[key].cost}) : deck.push({type: key, cost: distincts[key].cost})
     }
+    //Пока что театр не будет работать для 2 и 3 игроков
+    if (players < 4) deck9 = deck9.filter(card => card.type != "theater");
     shuffle(deck9).splice(14);
     return shuffle(deck.concat(...deck9));
 }

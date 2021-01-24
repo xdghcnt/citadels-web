@@ -90,7 +90,7 @@ class Card extends React.Component {
             isCharacter = type === "character",
             backgroundImage = `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
                 isCharacter
-                    ? (card ? card : "card_back")
+                    ? (card !== "0_1" ? card : "card_back")
                     : cardType || "card_back"
             }.jpg)`,
             cardChosen = game.state.cardChosen.includes(this.props.id),
@@ -104,11 +104,11 @@ class Card extends React.Component {
                 "decoration": card.decoration
             })}
                  style={{"background-image": backgroundImage}}
-                 onMouseDown={(e) => game.handleCardPress(e)}
+                 onMouseDown={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
                  onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>
-                {!noZoom && card ? (<div className="card-zoom-button material-icons"
+                {!noZoom && card !== "0_1" ? (<div className="card-zoom-button material-icons"
                                          onMouseDown={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
-                {!noZoom && card ? (<div className={`card-item-zoomed ${type}`}
+                {!noZoom && card !== "0_1" ? (<div className={`card-item-zoomed ${type}`}
                                          style={{"background-image": backgroundImage}}/>) : ""}
                 {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
             </div>
@@ -126,6 +126,7 @@ class PlayerSlot extends React.Component {
             districts = data.playerDistricts[slot],
             character = player === data.userId && data.player ? data.player.character : data.playerCharacter[slot],
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
+            theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
             score = data.playerScore[slot],
             isMyTurn = slot === data.currentPlayer,
             isWinner = slot === data.winnerPlayer;
@@ -151,7 +152,10 @@ class PlayerSlot extends React.Component {
                             </div>
                         ))}
                         {magicianAction && slot != data.userSlot ?
-                            <button onClick={() => game.handleMagician(slot, [])}>Exchange</button>
+                            <button onClick={() => game.handleMagician(slot, [])}>Обменяться картами</button>
+                            : null}
+                        {theaterAction && slot != data.userSlot ?
+                            <button onClick={() => game.handleTheater(slot, [])}>Обменяться персонажем</button>
                             : null}
                     </div>
                     {data.playerCharacter[slot] ?
@@ -290,6 +294,14 @@ class Game extends React.Component {
         this.socket.emit('build', card)
     }
 
+    handleTheater(slot) {
+        this.socket.emit('theater-action', slot)
+    }
+
+    handleForgery() {
+        this.socket.emit('forgery-action')
+    }
+
     handleAssassined(char) {
         this.socket.emit("kill-character", char);
     }
@@ -310,6 +322,13 @@ class Game extends React.Component {
         }));
     }
 
+    handleArsenalOn() {
+        this.setState(Object.assign(this.state, {
+            userAction: 'arsenal',
+            cardChosen: []
+        }));
+    }
+
     handleMagicianOff() {
         this.setState(Object.assign(this.state, {
             userAction: null,
@@ -326,8 +345,12 @@ class Game extends React.Component {
     }
 
     handleClickBuilding(slot, card) {
-        if (this.state.player.action == 'warlord-action') this.socket.emit("destroy", slot, card);
-        if (this.state.player.action == 'artist-action') this.socket.emit("beautify", slot, card);
+        if (this.state.userAction === 'arsenal') {
+            this.socket.emit("arsenal-destroy", slot, card);
+            this.handleMagicianOff();
+        }
+        if (this.state.player.action === 'warlord-action') this.socket.emit("destroy", slot, card);
+        if (this.state.player.action === 'artist-action') this.socket.emit("beautify", slot, card);
     }
 
     handleEndTurn() {
@@ -448,13 +471,18 @@ class Game extends React.Component {
         popup.confirm({content: `Give host ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("give-host", id));
     }
 
+    hasDistricts(building) {
+        const data = this.state;
+        return data.player && data.playerDistricts[data.userSlot] && data.playerDistricts[data.userSlot].some(card => card.type === building) && data.phase === 2
+    }
     render() {
         const
             data = this.state,
             isHost = data.hostId === data.userId,
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             notEnoughPlayers = data.phase === 0 && playerCount < 2,
-            magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2;
+            magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
+            theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5;
 
         if (this.state.disconnected)
             return (<div
@@ -554,7 +582,7 @@ class Game extends React.Component {
                                         + (data.player.action === "discard" ? " discard" : "")
                                     }>
                                         <div
-                                            className="status-text">{data.player.action === "discard" ? "Discard" : "Choose"} character
+                                            className="status-text">{data.player.action === "discard" ? "Сбросьте" : "Выберите себе"} персонажа
                                         </div>
                                         <div className="cards-list">
                                             {data.player && data.player.choose && data.player.choose.map((card, id) => (
@@ -588,6 +616,12 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
+                                {data.phase == 1.5 ?
+                                    <div className="action-button">
+                                        {theaterAction ?
+                                            <button onClick={() => this.handleTheater(data.userSlot)}>Отказаться от театра</button> : null}
+                                    </div>
+                                    : null}
                                 {data.phase == 2 && !data.userAction ?
                                     <div className="action-button">
                                         {!data.tookResource ?
@@ -598,6 +632,10 @@ class Game extends React.Component {
                                                 card</button> : null}
                                         {magicianAction ?
                                             <button onClick={() => this.handleMagicianOn()}>Сбросить</button> : null}
+                                        {this.hasDistricts('arsenal') ?
+                                            <button onClick={() => this.handleArsenalOn()}>Исп. Арсенал</button> : null}
+                                        {this.hasDistricts('forgery') && data.playerGold[data.userSlot] > 1 && data.forgeryAction ?
+                                            <button onClick={() => this.handleForgery()}>Исп. Кузницу</button> : null}
                                         {data.incomeAction ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
                                                 доход</button> : null}
@@ -605,6 +643,7 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
+                                
                                 {data.phase == 3 ?
                                     <div className="choose-card">
                                         <p className="status-text">Выберите карту</p>
@@ -616,14 +655,18 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
-                                {data.userAction == 'magician' ?
+                                {data.userAction ?
                                     <div>
                                         <div className="action-button">
-                                            <button onClick={() => this.handleMagicianOff()}>Cancel Discard</button>
-                                            <button
+                                            <button onClick={() => this.handleMagicianOff()}>Отмена действия</button>
+                                            { data.userAction === 'magician' ? <button
                                                 onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Применить
-                                            </button>
+                                            </button> : null}
                                         </div>
+                                    </div>
+                                    : null}
+                                {data.userAction === 'magician' ?
+                                    <div>
                                         <div className="hand-section">
                                             <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
                                                 {data.player && data.player.hand && data.player.hand.map((card, id) => (

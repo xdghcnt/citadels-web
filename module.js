@@ -92,7 +92,7 @@ function init(wsServer, path) {
                         room.playerCharacter = {};
                         room.playerScore = {};
                         room.teamsLocked = true;
-                        state.districtDeck = utils.createDeck();
+                        state.districtDeck = utils.createDeck(state.playersCount);
                         if (room.winnerPlayer != null)
                             utils.shuffle(room.playerSlots);
                         room.playerSlots.forEach((player, slot) => {
@@ -171,10 +171,21 @@ function init(wsServer, path) {
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else {
-                        room.phase = 2;
-                        nextCharacter();
+                        let _theater = -1;
+                        Object.keys(players).forEach(slot => _theater = include(Number(slot), 'theater') ? Number(slot) : _theater);
+                        if (_theater === -1) {
+                            room.phase = 2;
+                            nextCharacter();
+                        } else {
+                            room.phase = 1.5;
+                            sendStateSlot(room.currentPlayer);  
+                            room.currentPlayer = _theater;
+                            players[room.currentPlayer].action = 'theater-action';
+                            update();
+                            sendStateSlot(room.currentPlayer);  
+                        }
                     }
-                },
+                }, 
                 nextChoose2 = () => {
                     switch (state.characterDeck.length) {
                         case 6:
@@ -220,6 +231,9 @@ function init(wsServer, path) {
 
                     room.buildDistincts = 1;
                     room.tookResource = false;
+                    room.forgeryAction = true;
+                    room.laboratoryAction = true;
+                    room.museumAction = true;
                     switch (room.currentCharacter) {
                         case 4:
                         case 5:
@@ -393,6 +407,19 @@ function init(wsServer, path) {
                         nextChoose2();
                     }
                 },
+                "theater-action": (slot, slot_d) => {
+                    if (room.phase === 1.5 && players[slot_d] && players[slot].action === 'theater-action') {
+                        if (slot !== slot_d) {
+                            [players[slot].character, players[slot_d].character] = [players[slot_d].character, players[slot].character]
+                            [slot, slot_d].map(_slot => players[_slot].character.forEach(role => state.characterRoles[role] = _slot));
+                            sendStateSlot(slot_d);
+                        }
+                        room.phase = 2;
+                        players[slot].action === null;
+                        sendStateSlot(slot);
+                        nextCharacter();
+                    }        
+                },
                 "take-resources": (slot, res) => {
                     if (room.phase === 2 && slot === room.currentPlayer && !room.tookResource && ~['coins', 'card'].indexOf(res)) {
                         if (res === 'coins') {
@@ -522,9 +549,33 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
+                "arsenal-destroy": (slot, slot_d, card) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'arsenal') && room.playerDistricts[slot_d][card]) {
+                        if (getDistrictsCount(slot_d) >= state.maxDistricts)
+                            return sendSlot(slot, "message", 'Вы не можете использовать Арсенал на законченном городе');
+                        state.districtDeck.push(...room.playerDistricts[slot_d].splice(card, 1));
+                        const arsenal = room.playerDistricts[slot].findIndex(card => card.type === 'arsenal');
+                        state.districtDeck.push(...room.playerDistricts[slot].splice(arsenal, 1));
+                        countPoints(slot_d);
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "forgery-action": (slot) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'forgery') && room.forgeryAction && room.playerGold[slot] > 1) {
+                        players[slot].hand.push(...state.districtDeck.splice(0, 3));
+                        room.playerGold[slot] -= 2;
+                        room.playerHand[slot] = players[slot].hand.length;
+                        room.forgeryAction = false;
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
                 "beautify": (slot, slot_d, card) => {
                     if (room.phase === 2 && players[slot].action === 'artist-action' && players[slot].artistAction
-                        && slot === slot_d && room.playerDistricts[slot][card] && !room.playerDistricts[slot][card].decoration) {
+                        && slot === slot_d && room.playerDistricts[slot][card] && !room.playerDistricts[slot][card].decoration && room.playerGold[slot]) {
                         room.playerDistricts[slot][card].decoration = true;
                         players[slot].artistAction -= 1;
                         room.playerGold[slot] -= 1;
