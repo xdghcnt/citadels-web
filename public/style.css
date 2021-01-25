@@ -489,6 +489,10 @@ body {
 
 .player:hover .player-host-controls, .player:focus .player-host-controls {
     display: inline-block;
+}
+
+.profile-name .player:hover .player-host-controls,
+.profile-name .player:focus .player-host-controls {
     position: absolute;
     width: 100%;
     text-align: center;
@@ -735,8 +739,9 @@ button {
     .status-text {
         position: static;
     }
+
     .hand-section .cards-list {
-         flex-wrap: wrap;
+        flex-wrap: wrap;
     }
 }
 
