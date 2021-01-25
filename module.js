@@ -76,7 +76,7 @@ function init(wsServer, path) {
                     let slot = room.currentPlayer;
                     slot++;
                     while (!players[slot]) {
-                        if (slot === 7)
+                        if (slot > 7)
                             slot = 0;
                         else
                             slot++;
@@ -122,14 +122,9 @@ function init(wsServer, path) {
                     room.phase = 1;
                     room.currentCharacter = 0;
                     state.characterDeck = [...room.characterInGame];
-                    room.characterFace = [];
-
                     let discard = state.playersCount + 1 === room.characterInGame.length || state.playersCount < 4 ? 0 : room.characterInGame.length - 2 - state.playersCount;
-                    while (room.characterFace.length < discard) {
-                        let rnd = Math.floor(Math.random() * state.characterDeck.length);
-                        if (state.characterDeck[rnd] !== 4)
-                            room.characterFace.push(...state.characterDeck.splice(rnd, 1));
-                    }
+                    room.characterFace = utils.shuffle(state.characterDeck.filter(card => card !== 4)).splice(0, discard);
+                    state.characterDeck = state.characterDeck.filter(card => !room.characterFace.includes(card));
 
                     let rnd = Math.floor(Math.random() * state.characterDeck.length);
                     state.discarded = state.characterDeck.splice(rnd, 1);
