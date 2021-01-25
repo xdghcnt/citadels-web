@@ -633,12 +633,13 @@ button {
 .status-text {
     position: absolute;
     left: 1px;
-    top: -19px;
+    top: -20px;
     background: #ffffff7d;
-    padding: 3px;
+    padding: 4px;
     color: black;
     font-weight: 400;
     z-index: 1;
+    box-shadow: 0 0 6px 1px black;
 }
 
 .action-button {
@@ -661,6 +662,7 @@ button {
     width: 4px;
     top: -2px;
     box-shadow: 0 0 3px 1px #0d0d0d;
+    cursor: default;
 }
 
 .action-button button:first-child:before,
