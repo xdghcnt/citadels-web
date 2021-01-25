@@ -405,6 +405,7 @@ body {
     background-image: none !important;
     z-index: 3 !important;
     opacity: 1 !important;
+    filter: none !important;
 }
 
 .card-item.zoomed .card-item-zoomed {
