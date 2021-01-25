@@ -62,23 +62,24 @@ const shuffle = array => {
         [array[i], array[j]] = [array[j], array[i]];
     }
     return array
-}
+};
 
-const createDeck = (players) => {
+const createDeck = (players, testMode) => {
     const deck = Array();
     let deck9 = Array();
     for (key in distincts) {
-        for (i = 0; i < distincts[key].quantity; i++) 
-            distincts[key].type == 9 ? deck9.push({type: key, cost: distincts[key].cost}) : deck.push({type: key, cost: distincts[key].cost})
+        for (i = 0; i < distincts[key].quantity; i++)
+            (distincts[key].type === 9 ? deck9 : deck).push({type: key, cost: distincts[key].cost, kind: distincts[key].type});
     }
     //Пока что театр не будет работать для 2 и 3 игроков
-    if (players < 4) deck9 = deck9.filter(card => card.type != "theater");
-    shuffle(deck9).splice(14);
+    if (players < 4) deck9 = deck9.filter(card => card.type !== "theater");
+    if (!testMode)
+        shuffle(deck9).splice(14);
     return shuffle(deck.concat(...deck9));
-}
+};
 
 module.exports = {
     distincts: distincts,
     shuffle: shuffle,
     createDeck: createDeck
-}
+};

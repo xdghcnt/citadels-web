@@ -107,9 +107,9 @@ class Card extends React.Component {
                  onMouseDown={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
                  onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>
                 {!noZoom && card !== "0_1" ? (<div className="card-zoom-button material-icons"
-                                         onMouseDown={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
+                                                   onMouseDown={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
                 {!noZoom && card !== "0_1" ? (<div className={`card-item-zoomed ${type}`}
-                                         style={{"background-image": backgroundImage}}/>) : ""}
+                                                   style={{"background-image": backgroundImage}}/>) : ""}
                 {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
             </div>
         );
@@ -407,8 +407,7 @@ class Game extends React.Component {
     }
 
     handleClickStop() {
-        if (this.state.phase === 0 || confirm("Game will be aborted. Are you sure?"))
-            this.socket.emit("abort-game");
+        popup.confirm({content: `Игра будет закончена. Вы уверены?`}, (evt) => evt.proceed && this.socket.emit("abort-game"));
     }
 
     handleToggleTeamLockClick() {
@@ -463,7 +462,10 @@ class Game extends React.Component {
 
     handleRemovePlayer(id, evt) {
         evt.stopPropagation();
-        popup.confirm({content: `Removing ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("remove-player", id));
+        if (this.state.testMode)
+            this.socket.emit("remove-player", id);
+        else
+            popup.confirm({content: `Removing ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("remove-player", id));
     }
 
     handleGiveHost(id, evt) {
@@ -475,6 +477,7 @@ class Game extends React.Component {
         const data = this.state;
         return data.player && data.playerDistricts[data.userSlot] && data.playerDistricts[data.userSlot].some(card => card.type === building) && data.phase === 2
     }
+
     render() {
         const
             data = this.state,
@@ -496,6 +499,11 @@ class Game extends React.Component {
                     : activeSlots).map((n) => parseInt(n));
             const districtCardsMinimized = data.player && data.currentPlayer === data.userSlot && ((data.phase === 1)
                 || data.phase == 3 || data.phase === 2 && (data.player.action === 'assassin-action' || data.player.action === 'thief-action'));
+            const
+                userActionText = {
+                    magician: "Выберите карты для сброса",
+                    arsenal: "Выберите постройку для сноса"
+                }[data.userAction];
             return (
                 <div
                     className={cs(`game`, {
@@ -617,21 +625,30 @@ class Game extends React.Component {
                                     </div>
                                     : null}
                                 {data.phase == 1.5 ?
+                                    <>
+                                    <p className="status-text">Выберите игрока для обмена персонажем</p>
                                     <div className="action-button">
                                         {theaterAction ?
-                                            <button onClick={() => this.handleTheater(data.userSlot)}>Отказаться от театра</button> : null}
+                                            <button onClick={() => this.handleTheater(data.userSlot)}>Отказаться от
+                                                театра</button> : null}
                                     </div>
+                                    </>
                                     : null}
                                 {data.phase == 2 && !data.userAction ?
                                     <div className="action-button">
                                         {!data.tookResource ?
-                                            <button onClick={() => this.handleTakeResource('coins')}>Take 2
-                                                coins</button> : null}
+                                            <button onClick={() => this.handleTakeResource('coins')}>Получить 2
+                                                монеты</button> : null}
                                         {!data.tookResource ?
-                                            <button onClick={() => this.handleTakeResource('card')}>Take a
-                                                card</button> : null}
+                                            <span className="button-or">
+                                                или
+                                            </span> : null}
+                                        {!data.tookResource ?
+                                            <button onClick={() => this.handleTakeResource('card')}>Взять
+                                                карту</button> : null}
                                         {magicianAction ?
-                                            <button onClick={() => this.handleMagicianOn()}>Сбросить</button> : null}
+                                            <button onClick={() => this.handleMagicianOn()}>Сбросить
+                                                карты</button> : null}
                                         {this.hasDistricts('arsenal') ?
                                             <button onClick={() => this.handleArsenalOn()}>Исп. Арсенал</button> : null}
                                         {this.hasDistricts('forgery') && data.playerGold[data.userSlot] > 1 && data.forgeryAction ?
@@ -643,7 +660,7 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
-                                
+
                                 {data.phase == 3 ?
                                     <div className="choose-card">
                                         <p className="status-text">Выберите карту</p>
@@ -659,7 +676,8 @@ class Game extends React.Component {
                                     <div>
                                         <div className="action-button">
                                             <button onClick={() => this.handleMagicianOff()}>Отмена действия</button>
-                                            { data.userAction === 'magician' ? <button
+                                            <p className="status-text">{userActionText}</p>
+                                            {data.userAction === 'magician' ? <button
                                                 onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Применить
                                             </button> : null}
                                         </div>
@@ -731,16 +749,13 @@ class Game extends React.Component {
                                       className="material-icons start-game settings-button">lock_outline</i>)
                                 : (<i onClick={() => this.handleToggleTeamLockClick()}
                                       className="material-icons start-game settings-button">lock_open</i>)) : ""}
-                            {(isHost && data.phase !== 0)
-                                ? (<i onClick={() => this.handleClickStop()}
-                                      className="toggle-theme material-icons settings-button">stop</i>) : ""}
                             {isHost ? (data.phase === 0
                                 ? (<i onClick={() => this.handleClickTogglePause()}
                                       title={notEnoughPlayers ? "Not enough players" : ""}
                                       className={`material-icons start-game settings-button ${notEnoughPlayers
                                           ? "inactive" : ""}`}>play_arrow</i>)
-                                : (<i onClick={() => this.handleClickTogglePause()}
-                                      className="material-icons start-game settings-button">sync</i>)) : ""}
+                                : <i onClick={() => this.handleClickStop()}
+                                     className="toggle-theme material-icons settings-button">stop</i>) : ""}
                             <i onClick={() => this.handleClickChangeName()}
                                className="toggle-theme material-icons settings-button">edit</i>
                         </div>

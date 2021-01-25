@@ -30,7 +30,7 @@ function init(wsServer, path) {
                 phase: 0,
                 currentPlayer: null,
                 currentCharacter: 0,
-
+                testMode,
                 playerGold: {},
                 playerHand: {},
                 playerDistricts: {},
@@ -38,7 +38,7 @@ function init(wsServer, path) {
                 playerScore: {}
             };
             if (testMode)
-                [1, 2, 3, 4, 5, 6, 7].forEach((_, ind) => {
+                [1, 2, 3, 4].forEach((_, ind) => {
                     room.playerSlots[ind] = `kek${ind}`;
                     room.playerNames[`kek${ind}`] = `kek${ind}`;
                 });
@@ -98,9 +98,11 @@ function init(wsServer, path) {
                         room.playerSlots.forEach((player, slot) => {
                             if (player != null) {
                                 players[slot] = {
-                                    hand: state.districtDeck.splice(0, 4)
+                                    hand: (slot === 0 && testMode)
+                                        ? utils.createDeck(state.playersCount, true).filter((card) => card.kind === 9)
+                                        : state.districtDeck.splice(0, 4)
                                 };
-                                room.playerGold[slot] = 2;
+                                room.playerGold[slot] = (slot === 0 && testMode) ? 99 : 2;
                                 room.playerHand[slot] = 4;
                                 room.playerDistricts[slot] = [];
                                 room.playerCharacter[slot] = [];
@@ -178,14 +180,14 @@ function init(wsServer, path) {
                             nextCharacter();
                         } else {
                             room.phase = 1.5;
-                            sendStateSlot(room.currentPlayer);  
+                            sendStateSlot(room.currentPlayer);
                             room.currentPlayer = _theater;
                             players[room.currentPlayer].action = 'theater-action';
                             update();
-                            sendStateSlot(room.currentPlayer);  
+                            sendStateSlot(room.currentPlayer);
                         }
                     }
-                }, 
+                },
                 nextChoose2 = () => {
                     switch (state.characterDeck.length) {
                         case 6:
@@ -290,8 +292,8 @@ function init(wsServer, path) {
                     room.currentPlayer = null;
                     Object.keys(players).forEach(slot => {
                         countPoints(Number(slot));
-                        if (players[slot].hand.includes("secret_vault")) {
-                            room.playerDistricts[slot].push("secret_vault");
+                        if (players[slot].hand.some((card) => card.type === "secret_vault")) {
+                            room.playerDistricts[slot].push({ type: "secret_vault", cost: 0 });
                             room.playerScore[slot] += 3;
                         }
                         players[slot].character = [];
@@ -301,7 +303,7 @@ function init(wsServer, path) {
                     for (let i = 1; i <= room.characterInGame.length; i++) {
                         if (state.characterRoles[i] !== null)
                             if (room.playerScore[state.characterRoles[i]] >= maxPoints) {
-                                maxPoints = room.playerScore[state.characterRoles[i]]
+                                maxPoints = room.playerScore[state.characterRoles[i]];
                                 room.winnerPlayer = state.characterRoles[i];
                             }
                     }
@@ -336,7 +338,7 @@ function init(wsServer, path) {
                         bonusPoints += acc[9] * include(slot, "well_of_wishes");
                         if (Math.max(...Object.keys(acc).map((type) => acc[type])) >= 3) bonusPoints += 3 * include(slot, "capitol");
                         maxBonusPoints = Math.max(maxBonusPoints, bonusPoints);
-                    })
+                    });
                     room.playerScore[slot] += maxBonusPoints;
                 },
                 getDistrictsCount = (slot) => {
@@ -410,15 +412,16 @@ function init(wsServer, path) {
                 "theater-action": (slot, slot_d) => {
                     if (room.phase === 1.5 && players[slot_d] && players[slot].action === 'theater-action') {
                         if (slot !== slot_d) {
-                            [players[slot].character, players[slot_d].character] = [players[slot_d].character, players[slot].character]
-                            [slot, slot_d].map(_slot => players[_slot].character.forEach(role => state.characterRoles[role] = _slot));
+                            [players[slot].character, players[slot_d].character] = [players[slot_d].character, players[slot].character];
+                            [state.characterRoles[players[slot].character], state.characterRoles[players[slot_d].character]]
+                                = [state.characterRoles[players[slot_d].character], state.characterRoles[players[slot].character]];
                             sendStateSlot(slot_d);
                         }
                         room.phase = 2;
                         players[slot].action === null;
                         sendStateSlot(slot);
                         nextCharacter();
-                    }        
+                    }
                 },
                 "take-resources": (slot, res) => {
                     if (room.phase === 2 && slot === room.currentPlayer && !room.tookResource && ~['coins', 'card'].indexOf(res)) {
