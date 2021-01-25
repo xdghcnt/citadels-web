@@ -841,3 +841,42 @@ button {
     user-select: none;
     box-shadow: 0 0 3px 1px #0d0d0d;
 }
+
+.short-rules {
+    position: fixed;
+    padding: 3px;
+    left: 0;
+    top: 39px;
+    z-index: 1;
+    display: flex;
+}
+
+.short-rules img {
+    width: 700px;
+    vertical-align: top;
+    display: none;
+    margin: 3px;
+}
+
+.short-rules:hover img {
+    display: block;
+}
+
+.panel {
+    box-shadow: 0 0 6px 1px black;
+}
+
+.short-rules-title {
+    align-self: center;
+    width: 0;
+    overflow: hidden;
+    transition: width 0.3s;
+}
+
+.short-rules:hover .short-rules-title {
+    display: none;
+}
+
+.first-period .short-rules-title {
+    width: 60px;
+}

@@ -67,7 +67,7 @@ class Spectators extends React.Component {
         return (
             <div
                 onClick={handleSpectatorsClick}
-                className="spectators">
+                className="spectators panel">
                 Наблюдают:
                 {
                     data.spectators.length ? data.spectators.map(
@@ -196,6 +196,7 @@ class PlayerSlot extends React.Component {
 class Game extends React.Component {
 
     componentDidMount() {
+        this.gameName = "citadels";
         const initArgs = {};
         if (!localStorage.citadelsUserId || !localStorage.citadelsUserToken) {
             while (!localStorage.userName)
@@ -215,7 +216,7 @@ class Game extends React.Component {
         this.socket = window.socket.of("citadels");
         this.socket.on("state", (state) => {
             CommonRoom.processCommonRoom(state, this.state, {
-                maxPlayers: 7,
+                maxPlayers: 8,
                 largeImageKey: "citadels",
                 details: "Citadels"
             });
@@ -626,12 +627,12 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 1.5 ?
                                     <>
-                                    <p className="status-text">Выберите игрока для обмена персонажем</p>
-                                    <div className="action-button">
-                                        {theaterAction ?
-                                            <button onClick={() => this.handleTheater(data.userSlot)}>Отказаться от
-                                                театра</button> : null}
-                                    </div>
+                                        <p className="status-text">Выберите игрока для обмена персонажем</p>
+                                        <div className="action-button">
+                                            {theaterAction ?
+                                                <button onClick={() => this.handleTheater(data.userSlot)}>Отказаться от
+                                                    театра</button> : null}
+                                        </div>
                                     </>
                                     : null}
                                 {data.phase == 2 && !data.userAction ?
@@ -699,6 +700,11 @@ class Game extends React.Component {
                             </div>
                             : null}
                     </div>
+                    <div className="short-rules panel">
+                        <i className="material-icons">list_alt</i>
+                        <div className="short-rules-title">Памятка</div>
+                        <img src="/citadels/short-rules.jpg"/>
+                    </div>
                     <div className={"spectators-section"
                     + ((data.spectators.length > 0 || !data.teamsLocked) ? " active" : "")
                     }>
@@ -739,7 +745,7 @@ class Game extends React.Component {
                             </div>
                         </div>
                         : ""}
-                    <div className="host-controls">
+                    <div className="host-controls panel">
                         <div className="side-buttons">
                             {this.state.userId === this.state.hostId ?
                                 <i onClick={() => this.socket.emit("set-room-mode", false)}
