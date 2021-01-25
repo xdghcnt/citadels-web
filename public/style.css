@@ -18,6 +18,7 @@ h1, h2, h3 {
     display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative;
 }
 
 .player.self {
@@ -92,6 +93,8 @@ h1, h2, h3 {
     flex-direction: column;
     border-right: solid #737373 1px;
     position: relative;
+    width: 156px;
+    overflow: hidden;
 }
 
 .player-slot.my-turn {
@@ -110,6 +113,8 @@ h1, h2, h3 {
     font-size: 16px;
     color: white;
     width: 100%;
+    flex-wrap: nowrap;
+    white-space: nowrap;
 }
 
 .player-slot-0 .profile-name {
@@ -484,6 +489,14 @@ body {
 
 .player:hover .player-host-controls, .player:focus .player-host-controls {
     display: inline-block;
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    bottom: -20px;
+    z-index: 1;
+    background: #ffffffab;
+    color: black;
+    padding: 3px;
 }
 
 .host-button {
@@ -880,4 +893,8 @@ button {
 
 .first-period .short-rules-title {
     width: 60px;
+}
+
+.double-roles .profile {
+    width: 300px;
 }
