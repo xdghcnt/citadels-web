@@ -386,6 +386,7 @@ body {
     display: none;
     width: 395px;
     height: 688px;
+    background-size: cover;
 }
 
 .card-item-zoomed.card {
@@ -742,6 +743,10 @@ button {
 
     .hand-section .cards-list {
         flex-wrap: wrap;
+    }
+
+    .control-section {
+        background: none;
     }
 }
 

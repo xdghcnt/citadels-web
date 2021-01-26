@@ -105,10 +105,13 @@ class Card extends React.Component {
             })}
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
-                 onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>
+                 onTouchStart={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
+                 onTouchEnd={(e) => game.handleCardClick(e, this.props.onClick)}
+                 onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>>
                 {!noZoom && card !== "0_1" ? (<div className="card-zoom-button material-icons"
-                                                   onMouseDown={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
-                {!noZoom && card !== "0_1" ? (<div className={`card-item-zoomed ${type}`}
+                                                   onMouseDown={(e) => game.handleCardZoomClick(e)}
+                                                   onTouchStart={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
+                {!noZoom && card !== "0_1" ? (<div className={`card-item-zoomed`}
                                                    style={{"background-image": backgroundImage}}/>) : ""}
                 {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
             </div>
