@@ -86,19 +86,19 @@ class Card extends React.Component {
             cardType = card.type,
             type = this.props.type,
             isToken = this.props.isToken,
-            noZoom = card === 0 ? true : this.props.noZoom,
             isCharacter = type === "character",
-            backgroundImage = `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
+            getBackgroundImage = (isToken) => `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
                 isCharacter
                     ? (card !== "0_1" ? card : "card_back")
                     : cardType || "card_back"
             }.jpg)`,
+            backgroundImage = getBackgroundImage(isToken),
+            backgroundImageZoomed = getBackgroundImage(),
             cardChosen = game.state.cardChosen.includes(this.props.id),
             currentCharacter = game.state.currentCharacter === card,
             isSecretVault = card === "secret_vault";
         return (
             <div className={cs(type, "card-item", {
-                "no-zoom": noZoom,
                 "card-chosen": cardChosen || currentCharacter,
                 "secret-vault": isSecretVault,
                 "decoration": card.decoration
@@ -106,13 +106,12 @@ class Card extends React.Component {
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
                  onTouchStart={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
-                 onTouchEnd={(e) => game.handleCardClick(e, this.props.onClick)}
-                 onMouseUp={(e) => game.handleCardClick(e, this.props.onClick)}>>
-                {!noZoom && card !== "0_1" ? (<div className="card-zoom-button material-icons"
-                                                   onMouseDown={(e) => game.handleCardZoomClick(e)}
-                                                   onTouchStart={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
-                {!noZoom && card !== "0_1" ? (<div className={`card-item-zoomed`}
-                                                   style={{"background-image": backgroundImage}}/>) : ""}
+                 onClick={(e) => game.handleCardClick(e, this.props.onClick)}>
+                {card !== "0_1" ? (<div className="card-zoom-button material-icons"
+                                        onMouseDown={(e) => game.handleCardZoomClick(e)}
+                                        onTouchStart={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
+                {card !== "0_1" ? (<div className={`card-item-zoomed`}
+                                        style={{"background-image": backgroundImageZoomed}}/>) : ""}
                 {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
             </div>
         );
@@ -447,6 +446,8 @@ class Game extends React.Component {
     }
 
     handleCardPress(e) {
+        if (window.innerWidth < 750)
+            return;
         const node = e.target;
         if (!node.classList.contains("no-zoom")) {
             e.stopPropagation();
@@ -564,7 +565,7 @@ class Game extends React.Component {
                                                 </svg>
                                                 : null}
                                         </div>
-                                        <Card key={id} card={`${card}_1`} type="character" noZoom={true} game={this}
+                                        <Card key={id} card={`${card}_1`} type="character" game={this}
                                               isToken={true}/>
                                     </div>
                                 ))}
@@ -576,7 +577,7 @@ class Game extends React.Component {
                     </div>
                     <div className="control-section">
                         {data.player && data.player.hand && data.userAction != 'magician' ?
-                            <div className="hand-section">
+                            <div className={cs("hand-section", {noAction: !districtCardsMinimized})}>
                                 <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
                                     {data.player && data.player.hand && data.player.hand.map((card, id) => (
                                         <Card key={id} card={card} type="card" id={id}
