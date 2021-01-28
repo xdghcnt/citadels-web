@@ -319,7 +319,7 @@ h1, h2, h3 {
     opacity: 0.3;
 }
 
-.choose-character .character, .profile .character, .characters-panel .character{
+.choose-character .character, .profile .character, .characters-panel .character {
     width: 119px;
     height: 208px;
     background-size: cover;
@@ -768,7 +768,7 @@ button {
 
     .control-section {
     }
-    
+
     .hand-section {
         overflow-x: scroll;
         width: 100% !important;
@@ -779,18 +779,20 @@ button {
     }
 
     .character-section {
-        top: 40px;
+        /* top: 40px; */
         transform: none;
         width: 100%;
         justify-content: unset;
         bottom: unset;
+        background: linear-gradient(180deg, #0000008c, #00000052);
+        padding-top: 40px;
     }
 
     .character-section .cards-list {
         flex-flow: row;
     }
 
-    .character-section  .cards-list > * {
+    .character-section .cards-list > * {
         width: 100%;
     }
 
@@ -808,6 +810,11 @@ button {
     .action-section {
         margin-top: 0;
         max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .short-rules {
+        top: 146px !important;
     }
 }
 
@@ -918,7 +925,8 @@ button {
     top: 0;
 }
 
-.hand-section {}
+.hand-section {
+}
 
 .button-or {
     background: #ffffffab;
@@ -935,6 +943,7 @@ button {
     top: 39px;
     z-index: 1;
     display: flex;
+    z-index: 2;
 }
 
 .short-rules img {
@@ -942,6 +951,7 @@ button {
     vertical-align: top;
     display: none;
     margin: 3px;
+    max-width: 100%;
 }
 
 .short-rules:hover img {
@@ -973,41 +983,48 @@ button {
 
 #root {
     width: 100%;
-    min-width: 530px;
+    /* min-width: 530px; */
 }
 
 .hand-section.noAction {
     width: 83%;
 }
-        
+
 
 .control-section ::-webkit-scrollbar {
-            width: 16px;
-            height: 16px;
-        }
- .control-section ::-webkit-scrollbar-corner {
-            background-color: transparent;
-        }
-.control-section  ::-webkit-scrollbar-thumb {
-            background-color: #a7a7a7;
-            min-height: 40px;
-        }
-.control-section         ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-track {
-            border: 4px solid transparent;
-            background-clip: padding-box;
-            border-radius: 8px;
-        }
-.control-section         ::-webkit-scrollbar-track {
-            margin-bottom: 8px;
-        }
-.control-section         ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-track {
-            border: 4px solid transparent;
-            background-clip: padding-box;
-            border-radius: 8px;
-        }
-.control-section         ::-webkit-scrollbar-track {
-            background-color: #f0e9ea;
-        }
- .control-section        ::-webkit-scrollbar {
-            background-color: #606060;
-        }
+    width: 16px;
+    height: 16px;
+}
+
+.control-section ::-webkit-scrollbar-corner {
+    background-color: transparent;
+}
+
+.control-section ::-webkit-scrollbar-thumb {
+    background-color: #a7a7a7;
+    min-height: 40px;
+}
+
+.control-section ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-track {
+    border: 4px solid transparent;
+    background-clip: padding-box;
+    border-radius: 8px;
+}
+
+.control-section ::-webkit-scrollbar-track {
+    margin-bottom: 8px;
+}
+
+.control-section ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-track {
+    border: 4px solid transparent;
+    background-clip: padding-box;
+    border-radius: 8px;
+}
+
+.control-section ::-webkit-scrollbar-track {
+    background-color: #f0e9ea;
+}
+
+.control-section ::-webkit-scrollbar {
+    background-color: #606060;
+}
