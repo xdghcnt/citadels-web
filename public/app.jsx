@@ -31,7 +31,7 @@ class Player extends React.Component {
                     : (data.teamsLocked
                         ? (<div className="slot-empty">Empty</div>)
                         : (<div className="join-slot-button"
-                                onClick={() => this.props.handlePlayerJoin(this.props.slot)}>Seat</div>))}
+                                onClick={() => this.props.handlePlayerJoin(this.props.slot)}>Занять</div>))}
                 {hasPlayer
                     ? (<div className="player-host-controls">
                         {isHost && data.userId !== id ?
@@ -185,7 +185,7 @@ class PlayerSlot extends React.Component {
                     </div>
                     {score ?
                         <div className="score-block">
-                            <div className="score">Score: {score}</div>
+                            <div className="score">Очки: {score}</div>
                         </div>
                         : null}
                 </div>
