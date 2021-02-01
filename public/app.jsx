@@ -375,10 +375,15 @@ class Game extends React.Component {
                 ...this.state,
                 createGamePanel: {
                     charactersAvailable: [
-                        "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1)
+                        "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
+                        "1_2", "2_2", "3_2", "4_2", "5_2", "6_2", "7_2", "8_2", ...getNineCharacterAvailable(2),
+                        //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterSelected(1)
+                    ],
+                    districtsSelected: [
+                        ...this.state.uniqueDistricts.filter((district) => playerCount > 3 || district !== "theater")
                     ]
                 }
             });
@@ -386,7 +391,7 @@ class Game extends React.Component {
     }
 
     handleClickCreateGame() {
-        this.socket.emit("start-game", this.state.createGamePanel.charactersSelected);
+        this.socket.emit("start-game", this.state.createGamePanel.charactersSelected, this.state.createGamePanel.districtsSelected);
         this.handleClickCloseCreateGame();
     }
 
@@ -398,15 +403,33 @@ class Game extends React.Component {
     }
 
     handleClickCharacter(set, type) {
-        const playerCount = this.state.playerSlots && this.state.playerSlots.filter((slot) => slot !== null).length;
-        if (set === 1 && type === 9 && playerCount >= 4 && playerCount <= 7) {
-            const cardInd = this.state.createGamePanel.charactersSelected.indexOf(`9_1`);
-            if (~cardInd)
-                this.state.createGamePanel.charactersSelected.splice(cardInd);
+        const
+            playerCount = this.state.playerSlots && this.state.playerSlots.filter((slot) => slot !== null).length,
+            card = `${type}_${set}`,
+            currentCharacters = this.state.createGamePanel.charactersSelected,
+            alreadyHas = currentCharacters.includes(card);
+        if (!this.state.createGamePanel.charactersAvailable.includes(card))
+            return;
+        if (type === 9 && playerCount >= 4 && playerCount <= 7 && (alreadyHas || currentCharacters.length === 8)) {
+            if (alreadyHas)
+                currentCharacters.splice(8, 1);
             else
-                this.state.createGamePanel.charactersSelected.push(`9_1`);
-            this.setState(this.state);
-        }
+                currentCharacters.push(card);
+        } else
+            currentCharacters[type - 1] = card;
+        this.setState(this.state);
+    }
+
+    handleClickDistrict(district) {
+        const playerCount = this.state.playerSlots && this.state.playerSlots.filter((slot) => slot !== null).length;
+        if (playerCount < 4 && district === "theater")
+            return;
+        const districtIndex = this.state.createGamePanel.districtsSelected.indexOf(district);
+        if (districtIndex === -1)
+            this.state.createGamePanel.districtsSelected.push(district);
+        else
+            this.state.createGamePanel.districtsSelected.splice(districtIndex, 1);
+        this.setState(this.state);
     }
 
     handleClickStop() {
@@ -721,12 +744,10 @@ class Game extends React.Component {
                                     Выбор набора карт
                                 </div>
                                 <div className="characters-panel">
-                                    {Array(3).fill(null).map((_, set) =>
-                                        <>
-                                            {set === 1 ? <div className="not-implemented">В разработке</div> : ""}
-                                            <div className={cs("characters-set", {
-                                                notImplemented: set > 0
-                                            })}>
+                                    <div className="create-game-subtitle">Персонажи</div>
+                                    <div className={cs("characters-set")}>
+                                        {Array(3).fill(null).map((_, set) =>
+                                            <div className={cs("characters-row")}>
                                                 {Array(9).fill(null).map((_, type) => {
                                                         const card = `${type + 1}_${set + 1}`;
                                                         return <div className={cs("character-slot", {
@@ -739,8 +760,21 @@ class Game extends React.Component {
                                                         </div>;
                                                     }
                                                 )}
+                                            </div>)}
+
+                                    </div>
+                                    <div className="create-game-subtitle">Уникальные кварталы</div>
+                                    <div className={cs("district-set")}>
+                                        {data.uniqueDistricts.map((district) => (
+                                            <div className={cs("district-slot", {
+                                                selected: data.createGamePanel.districtsSelected.includes(district)
+                                            })}>
+                                                <Card card={{type: district}} type="card"
+                                                      game={this}
+                                                      onClick={() => this.handleClickDistrict(district)}/>
                                             </div>
-                                        </>)}
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="create-game-buttons">
                                     <button onClick={() => this.handleClickCloseCreateGame()}>Отмена</button>

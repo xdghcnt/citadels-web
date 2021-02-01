@@ -805,6 +805,11 @@ button {
         width: 40px;
         height: 40px;
         font-size: 40px;
+        opacity: 0.8;
+    }
+
+    .characters-panel .character-slot {
+        height: 128px;
     }
 
     .action-section {
@@ -872,7 +877,8 @@ button {
 }
 
 .characters-set {
-    display: flex;
+    width: 100%;
+    overflow-x: auto;
 }
 
 .create-game-title {
@@ -894,6 +900,10 @@ button {
     margin: 6px;
     border: 1px solid black;
     border-radius: 5px;
+}
+
+.characters-panel .character-slot {
+    height: 114px;
 }
 
 .character-slot.selected .character.card-item {
@@ -1027,4 +1037,46 @@ button {
 
 .control-section ::-webkit-scrollbar {
     background-color: #606060;
+}
+
+.character-slot.selected {
+    box-shadow: 0 1px 10px 0px #ff5722;
+}
+
+.character-slot.available {
+    cursor: pointer;
+}
+
+.create-game-buttons button {
+    margin: 0 7px;
+}
+
+.district-set {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+}
+
+.district-set .card-item {
+    height: 135px;
+    width: 63px;
+}
+.characters-row {
+    display: flex;
+}
+
+.create-game-subtitle {
+    font-size: 17px;
+    border-top: 2px solid #b0b0b0;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    padding-top: 5px;
+}
+
+.district-slot .card-item {
+    filter: grayscale(1);
+}
+
+.district-slot.selected .card-item {
+    filter: none;
 }

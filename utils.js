@@ -1,4 +1,4 @@
-const distincts = {
+const districts = {
 
     manor: {type: 4, cost: 3, quantity: 5},
     castle: {type: 4, cost: 4, quantity: 4},
@@ -57,29 +57,37 @@ const distincts = {
 };
 
 const shuffle = array => {
-    for (let i = array.length-1; i > 0; i--) {
-        let j = Math.floor(Math.random()*(i+1));
+    for (let i = array.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
     return array
 };
 
-const createDeck = (players, testMode) => {
+const createDeck = (players, districtsFilter) => {
     const deck = Array();
     let deck9 = Array();
-    for (key in distincts) {
-        for (i = 0; i < distincts[key].quantity; i++)
-            (distincts[key].type === 9 ? deck9 : deck).push({type: key, cost: distincts[key].cost, kind: distincts[key].type});
+    for (key in districts) {
+        for (i = 0; i < districts[key].quantity; i++)
+            if (districtsFilter.includes(key))
+                (districts[key].type === 9 ? deck9 : deck).push({
+                    type: key,
+                    cost: districts[key].cost,
+                    kind: districts[key].type
+                });
     }
     //Пока что театр не будет работать для 2 и 3 игроков
     if (players < 4) deck9 = deck9.filter(card => card.type !== "theater");
-    if (!testMode)
-        shuffle(deck9).splice(14);
     return shuffle(deck.concat(...deck9));
 };
 
+const getUniqueDistricts = () => {
+    return Object.keys(districts).filter((district) => districts[district].type === 9);
+};
+
 module.exports = {
-    distincts: distincts,
-    shuffle: shuffle,
-    createDeck: createDeck
+    districts,
+    shuffle,
+    createDeck,
+    getUniqueDistricts
 };
