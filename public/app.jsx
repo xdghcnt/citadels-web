@@ -32,7 +32,7 @@ class Player extends React.Component {
                         ? (<div className="slot-empty">Empty</div>)
                         : (<div className="join-slot-button"
                                 onClick={() => this.props.handlePlayerJoin(this.props.slot)}>Занять</div>))}
-                {hasPlayer
+                {(hasPlayer && (isHost || data.hostId === id))
                     ? (<div className="player-host-controls">
                         {isHost && data.userId !== id ?
                             (<i className="material-icons host-button"
@@ -101,7 +101,8 @@ class Card extends React.Component {
             <div className={cs(type, "card-item", {
                 "card-chosen": cardChosen || currentCharacter,
                 "secret-vault": isSecretVault,
-                "decoration": card.decoration
+                "decoration": card.decoration,
+                "in-action": !isCharacter && game.state.userAction === card.type
             })}
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
@@ -113,6 +114,9 @@ class Card extends React.Component {
                 {card !== "0_1" ? (<div className={`card-item-zoomed`}
                                         style={{"background-image": backgroundImageZoomed}}/>) : ""}
                 {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
+                {card.exposition ? <div className="exposition-count">
+                    <i className="material-icons">content_copy</i> {card.exposition.length}
+                </div> : ""}
             </div>
         );
     }
@@ -293,8 +297,42 @@ class Game extends React.Component {
         this.socket.emit('take-income')
     }
 
-    handleBuild(card) {
-        this.socket.emit('build', card)
+    toggleCardChoose(card) {
+        const
+            array = this.state.cardChosen,
+            cardInd = array.indexOf(card);
+        if (~cardInd)
+            array.splice(cardInd, 1);
+        else
+            array.push(card);
+        this.setState(this.state);
+    }
+
+    handleClickHandCard(cardInd) {
+        if (this.state.userAction === "magician")
+            this.toggleCardChoose(cardInd);
+        else if (this.state.userAction === "framework") {
+            this.socket.emit('framework-action', cardInd);
+            this.handleStopUserAction();
+        } else if (this.state.userAction === "museum") {
+            this.socket.emit('museum-action', cardInd);
+            this.handleStopUserAction();
+        } else if (this.state.userAction === "laboratory") {
+            this.socket.emit('laboratory-action', cardInd);
+            this.handleStopUserAction();
+        } else if (this.state.userAction === "den_of_thieves") {
+            if (this.state.player.hand[cardInd].type !== "den_of_thieves")
+                this.toggleCardChoose(cardInd);
+        } else if (this.state.userAction === "necropolis") {
+        } else {
+            const cardType = this.state.player.hand[cardInd].type;
+            if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts)
+                this.setUserAction("necropolis");
+            else if (cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts)
+                this.setUserAction("den_of_thieves");
+            else
+                this.socket.emit('build', cardInd);
+        }
     }
 
     handleTheater(slot) {
@@ -313,47 +351,49 @@ class Game extends React.Component {
         this.socket.emit("rob-character", char);
     }
 
-    handleMagician(slot, cards) {
-        this.socket.emit('exchange-hand', slot, cards);
-        this.handleMagicianOff();
+    handleApplyAction(slot, cards) {
+        if (this.state.userAction === "den_of_thieves")
+            this.socket.emit('build-den-of-thieves', cards);
+        else
+            this.socket.emit('exchange-hand', slot, cards);
+        this.handleStopUserAction();
     }
 
-    handleMagicianOn() {
+    handleClickBuildForGold() {
+        let index;
+        if (this.state.userAction === "necropolis")
+            index = this.state.player.hand.indexOf(this.state.player.hand.filter((card) => card.type === "necropolis")[0]);
+        else
+            index = this.state.player.hand.indexOf(this.state.player.hand.filter((card) => card.type === "den_of_thieves")[0]);
+        this.socket.emit('build', index);
+        this.handleStopUserAction();
+    }
+
+    setUserAction(action) {
         this.setState(Object.assign(this.state, {
-            userAction: 'magician',
+            userAction: action,
             cardChosen: []
         }));
     }
 
-    handleArsenalOn() {
-        this.setState(Object.assign(this.state, {
-            userAction: 'arsenal',
-            cardChosen: []
-        }));
-    }
-
-    handleMagicianOff() {
+    handleStopUserAction() {
         this.setState(Object.assign(this.state, {
             userAction: null,
             cardChosen: []
         }));
     }
 
-    handleMagicalCard(id) {
-        let _cardChosen = new Set(this.state.cardChosen);
-        _cardChosen.has(id) ? _cardChosen.delete(id) : _cardChosen.add(id);
-        this.setState(Object.assign(this.state, {
-            cardChosen: [..._cardChosen]
-        }));
-    }
-
     handleClickBuilding(slot, card) {
         if (this.state.userAction === 'arsenal') {
             this.socket.emit("arsenal-destroy", slot, card);
-            this.handleMagicianOff();
+            this.handleStopUserAction();
         }
         if (this.state.player.action === 'warlord-action') this.socket.emit("destroy", slot, card);
         if (this.state.player.action === 'artist-action') this.socket.emit("beautify", slot, card);
+        if (this.state.userAction === "necropolis") {
+            this.socket.emit("build-necropolis", slot);
+            this.handleStopUserAction();
+        }
     }
 
     handleEndTurn() {
@@ -513,7 +553,9 @@ class Game extends React.Component {
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             notEnoughPlayers = data.phase === 0 && playerCount < 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
-            theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5;
+            theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
+            necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
+            denOfThievesAction = data.player && data.userAction === 'den_of_thieves' && data.phase === 2;
 
         if (this.state.disconnected)
             return (<div
@@ -530,7 +572,11 @@ class Game extends React.Component {
             const
                 userActionText = {
                     magician: "Выберите карты для сброса",
-                    arsenal: "Выберите постройку для сноса"
+                    arsenal: "Выберите постройку для сноса",
+                    framework: "Выберите карту для постройки",
+                    museum: "Выберите карту для музея",
+                    necropolis: "Вы можете выбрать квартал для разрушения",
+                    den_of_thieves: "Вы можете выбрать карты для оплаты"
                 }[data.userAction];
             return (
                 <div
@@ -599,12 +645,12 @@ class Game extends React.Component {
                         {slots.map((slot) => (<PlayerSlot data={data} slot={slot} game={this}/>))}
                     </div>
                     <div className="control-section">
-                        {data.player && data.player.hand && data.userAction != 'magician' ?
+                        {data.player && data.player.hand ?
                             <div className={cs("hand-section", {noAction: !districtCardsMinimized})}>
                                 <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
                                     {data.player && data.player.hand && data.player.hand.map((card, id) => (
                                         <Card key={id} card={card} type="card" id={id}
-                                              onClick={() => this.handleBuild(id)}
+                                              onClick={() => this.handleClickHandCard(id)}
                                               game={this}/>
                                     ))}
                                 </div>
@@ -628,7 +674,7 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
-                                {data.phase == 2 && data.player.action === 'assassin-action' ?
+                                {data.phase == 2 && data.player.action === 'assassin-action' && !data.userAction ?
                                     <div className="choose-character">
                                         <p className="status-text">Выберите персонажа для убийства</p>
                                         <div className="cards-list">
@@ -639,7 +685,7 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
-                                {data.phase == 2 && data.player.action === 'thief-action' ?
+                                {data.phase == 2 && data.player.action === 'thief-action' && !data.userAction ?
                                     <div className="status-text" className="choose-character">
                                         <p className="status-text" className="status-text">Выберите персонажа для
                                             воровства</p>
@@ -675,10 +721,20 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleTakeResource('card')}>Взять
                                                 карту</button> : null}
                                         {magicianAction ?
-                                            <button onClick={() => this.handleMagicianOn()}>Сбросить
+                                            <button onClick={() => this.setUserAction("magician")}>Сбросить
                                                 карты</button> : null}
+                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts) ?
+                                            <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
+                                                леса</button> : null}
+                                        {(this.hasDistricts('museum') && data.player.hand.length && data.museumAction) ?
+                                            <button onClick={() => this.setUserAction("museum")}>Исп.
+                                                Музей</button> : null}
+                                        {(this.hasDistricts('laboratory') && data.player.hand.length && data.laboratoryAction) ?
+                                            <button onClick={() => this.setUserAction("laboratory")}>Исп.
+                                                Лабораторию</button> : null}
                                         {this.hasDistricts('arsenal') ?
-                                            <button onClick={() => this.handleArsenalOn()}>Исп. Арсенал</button> : null}
+                                            <button onClick={() => this.setUserAction("arsenal")}>Исп.
+                                                Арсенал</button> : null}
                                         {this.hasDistricts('forgery') && data.playerGold[data.userSlot] > 1 && data.forgeryAction ?
                                             <button onClick={() => this.handleForgery()}>Исп. Кузницу</button> : null}
                                         {data.incomeAction ?
@@ -703,24 +759,18 @@ class Game extends React.Component {
                                 {data.userAction ?
                                     <div>
                                         <div className="action-button">
-                                            <button onClick={() => this.handleMagicianOff()}>Отмена действия</button>
+                                            <button onClick={() => this.handleStopUserAction()}>Отмена действия</button>
                                             <p className="status-text">{userActionText}</p>
-                                            {data.userAction === 'magician' ? <button
-                                                onClick={() => this.handleMagician(data.userSlot, data.cardChosen)}>Применить
-                                            </button> : null}
-                                        </div>
-                                    </div>
-                                    : null}
-                                {data.userAction === 'magician' ?
-                                    <div>
-                                        <div className="hand-section">
-                                            <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
-                                                {data.player && data.player.hand && data.player.hand.map((card, id) => (
-                                                    <Card key={id} card={card} type="card" id={id}
-                                                          onClick={() => this.handleMagicalCard(id)}
-                                                          game={this}/>
-                                                ))}
-                                            </div>
+                                            {(magicianAction || denOfThievesAction)
+                                                ? <button
+                                                    onClick={() => this.handleApplyAction(data.userSlot, data.cardChosen)}>
+                                                    {data.userAction === "magician" ? "Применить" : "Построить"}
+                                                </button> : null}
+                                            {(necropolisAction)
+                                                ? <button
+                                                    onClick={() => this.handleClickBuildForGold()}>
+                                                    Построить за золото
+                                                </button> : null}
                                         </div>
                                     </div>
                                     : null}
