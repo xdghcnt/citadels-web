@@ -520,6 +520,7 @@ function init(wsServer, path) {
                             room.playerGold[slot] += 2;
                             if (include(slot, "gold_mine"))
                                 room.playerGold[slot] += 1;
+                            if (room.witched === room.currentCharacter && room.witchedstate === 2) return moveToWitch();
                         } else {
                             if (!state.districtDeck.length) return;
                             room.tookResource = true;
@@ -533,7 +534,6 @@ function init(wsServer, path) {
                             }
                         }
                         countPoints(slot);
-                        if (room.witched === room.currentCharacter && room.witchedstate === 2) return moveToWitch();
                         update();
                         sendStateSlot(slot);
                     }
@@ -545,9 +545,9 @@ function init(wsServer, path) {
                         room.playerHand[slot] += 1;
                         room.phase = 2;
                         countPoints(slot);
+                        sendStateSlot(slot);
                         if (room.witched === room.currentCharacter && room.witchedstate === 2) return moveToWitch();
                         update();
-                        sendStateSlot(slot);
                     }
                 },
                 "take-income": (slot) => {
