@@ -139,6 +139,8 @@ function init(wsServer, path) {
 
                     room.assassined = null;
                     room.robbed = null;
+                    room.witched = null;
+                    room.witchedstate = 0;
                     room.currentPlayer = room.king;
                     players[room.currentPlayer].action = 'choose';
                     players[room.currentPlayer].choose = state.characterDeck;
@@ -221,24 +223,45 @@ function init(wsServer, path) {
                     if (room.currentPlayer == undefined || room.assassined === room.currentCharacter) return nextCharacter();
                     room.playerCharacter[room.currentPlayer][players[room.currentPlayer].character.indexOf(room.currentCharacter)] = room.currentCharacter;
 
+                    room.buildDistricts = -1;
+                    room.tookResource = false;
+                    room.forgeryAction = false;
+                    room.laboratoryAction = false;
+                    room.museumAction = false;
+
+                    if (room.currentCharacter === "4_1") room.king = room.currentPlayer;
+                    if (room.witched === room.currentCharacter && room.witchedstate === 2) {
+                        update();
+                        sendStateSlot(room.currentPlayer);
+                    } else startTurn();
+                },
+                moveToWitch = () => {
+                    room.witchedstate = 1;
+                    room.currentPlayer = state.characterRoles["1_2"];
+                    startTurn();
+                },
+                startTurn = () => {
                     if (room.robbed === room.currentCharacter) {
                         let gold = room.playerGold[room.currentPlayer];
                         room.playerGold[room.currentPlayer] = 0;
                         countPoints(room.currentPlayer);
-                        room.playerGold[state.characterRoles["2_1"]] += gold;
-                        countPoints(state.characterRoles["2_1"]);
+                        let thief = room.witched === "2_1" ? "1_2" : "2_1";
+                        room.playerGold[state.characterRoles[thief]] += gold;
+                        countPoints(state.characterRoles[thief]);
                     }
-
+                    
                     room.buildDistricts = 1;
-                    room.tookResource = false;
                     room.forgeryAction = true;
                     room.laboratoryAction = true;
                     room.museumAction = true;
                     switch (room.currentCharacter) {
                         case "4_1":
+                        case "4_2":
                         case "5_1":
+                        case "5_2":
                         case "6_1":
                         case "8_1":
+                        case "8_2":
                             room.incomeAction = true;
                             break;
                         default:
@@ -250,14 +273,15 @@ function init(wsServer, path) {
                         case "1_1":
                             players[room.currentPlayer].action = 'assassin-action';
                             break;
+                        case "1_2":
+                            players[room.currentPlayer].action = 'witch-action';
+                            room.buildDistricts = -1;
+                            break;
                         case "2_1":
                             players[room.currentPlayer].action = 'thief-action';
                             break;
                         case "3_1":
                             players[room.currentPlayer].action = 'magician-action';
-                            break;
-                        case "4_1":
-                            room.king = room.currentPlayer;
                             break;
                         case "6_1":
                             room.playerGold[room.currentPlayer] += 1;
@@ -509,6 +533,7 @@ function init(wsServer, path) {
                             }
                         }
                         countPoints(slot);
+                        if (room.witched === room.currentCharacter && room.witchedstate === 2) return moveToWitch();
                         update();
                         sendStateSlot(slot);
                     }
@@ -520,6 +545,7 @@ function init(wsServer, path) {
                         room.playerHand[slot] += 1;
                         room.phase = 2;
                         countPoints(slot);
+                        if (room.witched === room.currentCharacter && room.witchedstate === 2) return moveToWitch();
                         update();
                         sendStateSlot(slot);
                     }
@@ -537,7 +563,7 @@ function init(wsServer, path) {
                     }
                 },
                 "build": (slot, cardInd) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && players[slot].hand[cardInd])
+                    if (room.phase === 2 && slot === room.currentPlayer && players[slot].hand[cardInd] && room.buildDistricts > -1)
                         build(slot, cardInd);
                 },
                 "kill-character": (slot, char) => {
@@ -548,8 +574,17 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
+                "bewitch-character": (slot, char) => {
+                    if (room.phase === 2 && players[slot].action === 'witch-action' && room.characterInGame.indexOf(char) > 0) {
+                        room.witched = char;
+                        room.witchedstate = 2;
+                        players[slot].action = null;
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
                 "rob-character": (slot, char) => {
-                    if (room.phase === 2 && players[slot].action === 'thief-action' && room.characterInGame.indexOf(char) > 1 && room.assassined !== char) {
+                    if (room.phase === 2 && players[slot].action === 'thief-action' && room.characterInGame.indexOf(char) > 1 && ![room.assassined, room.witched].includes(char)) {
                         room.robbed = char;
                         players[slot].action = null;
                         update();
@@ -581,8 +616,10 @@ function init(wsServer, path) {
                 },
                 "destroy": (slot, slot_d, cardInd) => {
                     if (room.phase === 2 && players[slot].action === 'warlord-action' && room.playerDistricts[slot_d][cardInd]) {
-                        if (state.characterRoles["5_1"] === slot_d && room.assassined !== "5_1")
-                            return sendSlot(slot, "message", 'Вы не можете использовать способность на построках Епископа');
+                        if (state.characterRoles["5_1"] === slot_d && room.assassined !== "5_1" && room.witched !== "5_1")
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на постройках Епископа');
+                        if (state.characterRoles["1_2"] === slot_d && room.witched === "5_1")
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на постройках Ведьмы, которая заколдовала Епископа');
                         if (getDistrictsCount(slot_d) >= state.maxDistricts)
                             return sendSlot(slot, "message", 'Вы не можете использовать способность на законченном городе');
                         const building = room.playerDistricts[slot_d][cardInd];
@@ -701,11 +738,14 @@ function init(wsServer, path) {
                 },
                 "end-turn": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.tookResource) {
-                        if (!room.playerGold[slot] && include(slot, "poor_house"))
-                            room.playerGold[slot] += 1;
-                        if (!players[slot].hand.length && include(slot, "park")) {
-                            players[slot].hand.push(...state.districtDeck.splice(0, 2));
-                            room.playerHand[slot] += 2;
+                        if (players[slot].action === 'witch-action') return;
+                        if (room.currentCharacter != "1_2") {
+                            if (!room.playerGold[slot] && include(slot, "poor_house"))
+                                room.playerGold[slot] += 1;
+                            if (!players[slot].hand.length && include(slot, "park")) {
+                                players[slot].hand.push(...state.districtDeck.splice(0, 2));
+                                room.playerHand[slot] += 2;
+                            }
                         }
                         players[slot].action = null;
                         players[slot].artistAction = undefined;
