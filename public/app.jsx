@@ -347,8 +347,9 @@ class Game extends React.Component {
         this.socket.emit('forgery-action')
     }
 
-    handleAssassined(char) {
-        this.socket.emit("kill-character", char);
+    handleActionRank1(char) {
+        if (this.state.player.action == 'assassin-action') this.socket.emit("kill-character", char);
+        if (this.state.player.action == 'witch-action') this.socket.emit("bewitch-character", char);
     }
 
     handleRob(char) {
@@ -420,7 +421,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        //"1_2", "2_2", "3_2", "4_2", "5_2", "6_2", "7_2", "8_2", ...getNineCharacterAvailable(2),
+                        "1_2", //"2_2", "3_2", "4_2", "5_2", "6_2", "7_2", "8_2", ...getNineCharacterAvailable(2),
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
@@ -572,7 +573,7 @@ class Game extends React.Component {
                         .map((value, slot) => !data.teamsLocked ? slot : value) : activeSlots)
                     : activeSlots).map((n) => parseInt(n));
             const districtCardsMinimized = data.player && data.currentPlayer === data.userSlot && ((data.phase === 1)
-                || data.phase == 3 || data.phase === 2 && (data.player.action === 'assassin-action' || data.player.action === 'thief-action'));
+                || data.phase == 3 || data.phase === 2 && (['assassin-action', 'thief-action', 'witch-action'].includes(data.player.action)));
             const
                 userActionText = {
                     magician: "Выберите карты для сброса",
@@ -596,10 +597,10 @@ class Game extends React.Component {
                                 {data.characterInGame.map((card, id) => (
                                     <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
                                         <div className={cs("status", {
-                                            assassined: card === data.assassined,
+                                            assassined: card === data.assassined || card === data.witched,
                                             robbed: card === data.robbed
                                         })}>
-                                            {card === data.assassined ?
+                                            {card === data.assassined || card === data.witched ?
                                                 <svg width="485pt" height="403pt" viewBox="0 0 485 403" version="1.1"
                                                      xmlns="http://www.w3.org/2000/svg">
                                                     <g id="#000000ff">
@@ -678,13 +679,13 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
-                                {data.phase == 2 && data.player.action === 'assassin-action' && !data.userAction ?
+                                {data.phase == 2 && ['assassin-action', 'witch-action'].includes(data.player.action) && !data.userAction ?
                                     <div className="choose-character">
-                                        <p className="status-text">Выберите персонажа для убийства</p>
+                                        <p className="status-text">Выберите персонажа для {data.player.action === "witch-action" ? "колдовства" : "убийства"}</p>
                                         <div className="cards-list">
                                             {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.characterInGame.indexOf(id) < 1)).map((card, id) => (
                                                 <Card key={id} card={card} type="character" game={this}
-                                                      onClick={() => this.handleAssassined(card)}/>
+                                                      onClick={() => this.handleActionRank1(card)}/>
                                             ))}
                                         </div>
                                     </div>
@@ -694,7 +695,7 @@ class Game extends React.Component {
                                         <p className="status-text" className="status-text">Выберите персонажа для
                                             воровства</p>
                                         <div className="cards-list">
-                                            {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id || data.characterInGame.indexOf(id) < 2))
+                                            {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || [data.assassined, data.witched].includes(id) || data.characterInGame.indexOf(id) < 2))
                                                 .map((card, id) => (
                                                     <Card key={id} card={card} type="character" game={this}
                                                           onClick={() => this.handleRob(card)}/>
@@ -724,6 +725,8 @@ class Game extends React.Component {
                                         {!data.tookResource ?
                                             <button onClick={() => this.handleTakeResource('card')}>Взять
                                                 карту</button> : null}
+                                        {data.witchedstate == 2 && data.witched == data.currentCharacter ? null : 
+                                        <div>
                                         {magicianAction ?
                                             <button onClick={() => this.setUserAction("magician")}>Сбросить
                                                 карты</button> : null}
@@ -744,6 +747,9 @@ class Game extends React.Component {
                                         {data.incomeAction ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
                                                 доход</button> : null}
+                                        </div>
+                                        }
+                                       
                                         {data.tookResource ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
