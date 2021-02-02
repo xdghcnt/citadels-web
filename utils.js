@@ -45,14 +45,14 @@ const distincts = {
     memorial: {type: 9, cost: 3, quantity: 1},
     capitol: {type: 9, cost: 5, quantity: 1},
 
-    //framework: {type: 9, cost: 3, quantity: 1},
+    framework: {type: 9, cost: 3, quantity: 1},
     arsenal: {type: 9, cost: 3, quantity: 1},
-    //museum: {type: 9, cost: 4, quantity: 1},
+    museum: {type: 9, cost: 4, quantity: 1},
     forgery: {type: 9, cost: 5, quantity: 1},
-    //laboratory: {type: 9, cost: 5, quantity: 1},
-    //necropolis: {type: 9, cost: 5, quantity: 1},
+    laboratory: {type: 9, cost: 5, quantity: 1},
+    necropolis: {type: 9, cost: 5, quantity: 1},
     theater: {type: 9, cost: 6, quantity: 1},
-    //den_of_thieves: {type: 9, cost: 6, quantity: 1},
+    den_of_thieves: {type: 9, cost: 6, quantity: 1},
 
 };
 

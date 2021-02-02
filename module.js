@@ -55,7 +55,9 @@ function init(wsServer, path) {
             const
                 send = (target, event, data) => userRegistry.send(target, event, data),
                 update = () => send(room.onlinePlayers, "state", room),
-                sendSlot = (slot, event, data) => send(room.playerSlots[slot], event, data),
+                sendSlot = (slot, event, data) => {
+                    send(room.playerSlots[slot], event, data);
+                },
                 sendState = (user) => {
                     const slot = room.playerSlots.indexOf(user);
                     if (players[slot]) {
@@ -99,7 +101,8 @@ function init(wsServer, path) {
                             if (player != null) {
                                 players[slot] = {
                                     hand: (slot === 0 && testMode)
-                                        ? utils.createDeck(state.playersCount, true).filter((card) => card.kind === 9)
+                                        ? utils.createDeck(state.playersCount, true).filter((card) =>
+                                            ["den_of_thieves", "necropolis"].includes(card.type))
                                         : state.districtDeck.splice(0, 4)
                                 };
                                 room.playerGold[slot] = (slot === 0 && testMode) ? 99 : 2;
@@ -287,8 +290,8 @@ function init(wsServer, path) {
                     room.currentPlayer = null;
                     Object.keys(players).forEach(slot => {
                         countPoints(Number(slot));
-                        if (players[slot].hand.some((card) => card.type === "secret_vault")) {
-                            room.playerDistricts[slot].push({ type: "secret_vault", cost: 0 });
+                        if (includeHand(slot, "secret_vault")) {
+                            room.playerDistricts[slot].push({type: "secret_vault", cost: 0});
                             room.playerScore[slot] += 3;
                         }
                         players[slot].character = [];
@@ -342,8 +345,54 @@ function init(wsServer, path) {
                         districtsCount++;
                     return districtsCount;
                 },
-                getDistrictCost = (card) => utils.distincts[card.type].cost + (card.decoration ? 1 : 0),
+                getDistrictCost = (card) => utils.distincts[card.type].cost
+                    + (card.decoration ? 1 : 0) + (card.exposition ? card.exposition.length : 0),
                 include = (slot, card) => room.playerDistricts[slot].some(building => building.type === card),
+                includeHand = (slot, card) => players[slot].hand.some(building => building.type === card),
+                getPlayerDistrictIndex = (slot, card) => room.playerDistricts[slot].findIndex((it) => it.type === card),
+                getPlayerDistrict = (slot, card) => room.playerDistricts[slot][getPlayerDistrictIndex(slot, card)],
+                build = (slot, cardInd, replaceCardInd, noRequireGold) => {
+                    const
+                        building = players[slot].hand[cardInd],
+                        districts = room.playerDistricts[slot];
+                    if (!(room.buildDistincts || building.type === "stable")) return;
+                    if (building.type === "monument" && districts.length + 2 >= state.maxDistricts)
+                        return sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
+                    if (building.type === "secret_vault")
+                        return sendSlot(slot, "message", "Вы не можете построить Тайное убежище");
+                    if (include(slot, building.type) && !include(slot, "quarry"))
+                        return sendSlot(slot, "message", 'У вас уже есть такой квартал');
+                    const cost = getDistrictCost(building) - include(slot, "factory") * (utils.distincts[building.type].type === 9);
+                    if (!noRequireGold && room.playerGold[slot] < cost)
+                        return sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
+                    if (building.type !== "stable")
+                        room.buildDistincts -= 1;
+                    if (!noRequireGold)
+                        room.playerGold[slot] -= cost;
+                    districts.push(...players[slot].hand.splice(cardInd, 1));
+                    room.playerHand[slot] -= 1;
+                    if (replaceCardInd !== undefined)
+                        destroy(slot, replaceCardInd);
+                    if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
+                        room.ender = slot;
+                    countPoints(slot);
+                    update();
+                    sendStateSlot(slot);
+                    return true;
+                },
+                destroy = (slot_d, cardInd) => {
+                    const building = room.playerDistricts[slot_d][cardInd];
+                    if (building.exposition) {
+                        state.districtDeck.push(...building.exposition);
+                        delete building.exposition;
+                    }
+                    if (building.decoration) {
+                        delete building.decoration;
+                    }
+                    dropCardDistricts(slot_d, cardInd);
+                },
+                dropCardHand = (slot, cardInd) => state.districtDeck.push(...players[slot].hand.splice(cardInd, 1)),
+                dropCardDistricts = (slot, cardInd) => state.districtDeck.push(...room.playerDistricts[slot].splice(cardInd, 1)),
                 removePlayer = (playerId) => {
                     if (room.spectators.has(playerId)) {
                         this.emit("user-kicked", playerId);
@@ -442,9 +491,9 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
-                "take-card": (slot, card) => {
-                    if (room.phase === 3 && slot === room.currentPlayer && ~players[slot].choose[card]) {
-                        players[slot].hand.push(...players[slot].choose.splice(card, 1));
+                "take-card": (slot, cardInd) => {
+                    if (room.phase === 3 && slot === room.currentPlayer && ~players[slot].choose[cardInd]) {
+                        players[slot].hand.push(...players[slot].choose.splice(cardInd, 1));
                         state.districtDeck.push(...players[slot].choose.splice(0));
                         room.playerHand[slot] += 1;
                         room.phase = 2;
@@ -465,30 +514,9 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
-                "build": (slot, card) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && ~players[slot].hand[card]) {
-                        const building = players[slot].hand[card];
-                        if (!(room.buildDistincts || building.type === "stable")) return;
-                        if (building.type === "monument" && room.playerDistricts[slot].length + 2 >= state.maxDistricts)
-                            return sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
-                        if (building.type === "secret_vault")
-                            return sendSlot(slot, "message", "Вы не можете построить Тайное убежище");
-                        if (include(slot, building.type) && !include(slot, "quarry"))
-                            return sendSlot(slot, "message", 'У вас уже есть такой квартал');
-                        const cost = getDistrictCost(building) - include(slot, "factory") * (utils.distincts[building.type].type === 9);
-                        if (room.playerGold[slot] < cost)
-                            return sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
-                        if (building.type !== "stable")
-                            room.buildDistincts -= 1;
-                        room.playerGold[slot] -= cost;
-                        room.playerDistricts[slot].push(...players[slot].hand.splice(card, 1));
-                        room.playerHand[slot] -= 1;
-                        if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
-                            room.ender = slot;
-                        countPoints(slot);
-                        update();
-                        sendStateSlot(slot);
-                    }
+                "build": (slot, cardInd) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && players[slot].hand[cardInd])
+                        build(slot, cardInd);
                 },
                 "kill-character": (slot, char) => {
                     if (room.phase === 2 && players[slot].action === 'assassin-action' && ~room.characterInGame.indexOf(char) && char != 1) {
@@ -506,13 +534,13 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
-                "exchange-hand": (slot, slot_d, cards) => {
+                "exchange-hand": (slot, slot_d, cardInds) => {
                     if (room.phase === 2 && players[slot].action === 'magician-action' && players[slot_d]) {
                         players[slot].action = null;
                         if (slot_d === slot) {
-                            if (!cards.length) return players[slot].action = 'magician-action';
-                            let _cards = cards.sort((a, b) => b - a);
-                            for (let key in _cards) state.districtDeck.push(...players[slot].hand.splice(_cards[key], 1));
+                            if (!cardInds.length) return players[slot].action = 'magician-action';
+                            let _cards = cardInds.sort((a, b) => b - a);
+                            for (let key in _cards) dropCardHand(slot, _cards[key]);
                             players[slot].hand.push(...state.districtDeck.splice(0, _cards.length));
                             sendStateSlot(slot);
                         } else {
@@ -526,13 +554,13 @@ function init(wsServer, path) {
                         }
                     }
                 },
-                "destroy": (slot, slot_d, card) => {
-                    if (room.phase === 2 && players[slot].action === 'warlord-action' && room.playerDistricts[slot_d][card]) {
+                "destroy": (slot, slot_d, cardInd) => {
+                    if (room.phase === 2 && players[slot].action === 'warlord-action' && room.playerDistricts[slot_d][cardInd]) {
                         if (state.characterRoles[5] === slot_d && room.assassined !== 5)
                             return sendSlot(slot, "message", 'Вы не можете использовать способность на построках Епископа');
                         if (getDistrictsCount(slot_d) >= state.maxDistricts)
                             return sendSlot(slot, "message", 'Вы не можете использовать способность на законченном городе');
-                        const building = room.playerDistricts[slot_d][card];
+                        const building = room.playerDistricts[slot_d][cardInd];
                         if (building.type === "keep")
                             return sendSlot(slot, "message", 'Вы не можете использовать способность на Форт');
                         const cost = getDistrictCost(building) - 1 + include(slot_d, "great_wall") * (building.type !== "great_wall");
@@ -540,20 +568,19 @@ function init(wsServer, path) {
                             return sendSlot(slot, "message", `Недостаточно монет ${room.playerGold[slot]}/${cost}).`);
                         players[slot].action = null;
                         room.playerGold[slot] -= cost;
-                        state.districtDeck.push(...room.playerDistricts[slot_d].splice(card, 1));
+                        destroy(slot_d, cardInd);
                         countPoints(slot_d);
                         countPoints(slot);
                         update();
                         sendStateSlot(slot);
                     }
                 },
-                "arsenal-destroy": (slot, slot_d, card) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'arsenal') && room.playerDistricts[slot_d][card]) {
+                "arsenal-destroy": (slot, slot_d, cardInd) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'arsenal') && room.playerDistricts[slot_d][cardInd]) {
                         if (getDistrictsCount(slot_d) >= state.maxDistricts)
                             return sendSlot(slot, "message", 'Вы не можете использовать Арсенал на законченном городе');
-                        state.districtDeck.push(...room.playerDistricts[slot_d].splice(card, 1));
-                        const arsenal = room.playerDistricts[slot].findIndex(card => card.type === 'arsenal');
-                        state.districtDeck.push(...room.playerDistricts[slot].splice(arsenal, 1));
+                        destroy(slot_d, cardInd);
+                        destroy(slot, room.playerDistricts[slot].findIndex(card => card.type === 'arsenal'));
                         countPoints(slot_d);
                         countPoints(slot);
                         update();
@@ -571,10 +598,72 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
-                "beautify": (slot, slot_d, card) => {
+                "framework-action": (slot, cardInd) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'framework')
+                        && players[slot].hand[cardInd]) {
+                        build(slot, cardInd, getPlayerDistrictIndex(slot, "framework"), true)
+                    }
+                },
+                "museum-action": (slot, cardInd) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'museum')
+                        && room.museumAction && players[slot].hand[cardInd]) {
+                        const museum = getPlayerDistrict(slot, "museum");
+                        museum.exposition = museum.exposition || [];
+                        museum.exposition.push(...players[slot].hand.splice(cardInd, 1));
+                        room.playerHand[slot]--;
+                        room.museumAction = false;
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "laboratory-action": (slot, cardInd) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'laboratory')
+                        && room.laboratoryAction && players[slot].hand[cardInd]) {
+                        dropCardHand(slot, cardInd);
+                        room.playerHand[slot]--;
+                        room.playerGold[slot] += 2;
+                        room.laboratoryAction = false;
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "build-necropolis": (slot, cardInd) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && includeHand(slot, 'necropolis')
+                        && players[slot].hand[cardInd]) {
+                        build(slot,
+                            players[slot].hand.findIndex((card) => card.type === "necropolis"),
+                            cardInd,
+                            true);
+                    }
+                },
+                "build-den-of-thieves": (slot, cardIndexes) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && includeHand(slot, 'den_of_thieves')
+                        && cardIndexes && cardIndexes.every && cardIndexes.every((cardInd) => players[slot].hand[cardInd])
+                        && (room.playerGold[slot] + cardIndexes.length) >= 6) {
+                        const
+                            cardsToDrop = players[slot].hand.filter((card, ind) => cardIndexes.includes(ind)),
+                            wasBuilt = build(
+                                slot,
+                                players[slot].hand.findIndex((card) => card.type === "den_of_thieves"),
+                                undefined,
+                                true);
+                        if (wasBuilt) {
+                            room.playerGold[slot] -= Math.max(0, 6 - cardIndexes.length);
+                            room.playerHand[slot] -= cardIndexes.length;
+                            players[slot].hand.forEach((card, ind) => {
+                                if (cardsToDrop.includes(card))
+                                    dropCardHand(slot, ind);
+                            });
+                        }
+                        update();
+                    }
+                },
+                "beautify": (slot, slot_d, cardInd) => {
                     if (room.phase === 2 && players[slot].action === 'artist-action' && players[slot].artistAction
-                        && slot === slot_d && room.playerDistricts[slot][card] && !room.playerDistricts[slot][card].decoration && room.playerGold[slot]) {
-                        room.playerDistricts[slot][card].decoration = true;
+                        && slot === slot_d && room.playerDistricts[slot][cardInd] && !room.playerDistricts[slot][cardInd].decoration && room.playerGold[slot]) {
+                        room.playerDistricts[slot][cardInd].decoration = true;
                         players[slot].artistAction -= 1;
                         room.playerGold[slot] -= 1;
                         countPoints(slot);
