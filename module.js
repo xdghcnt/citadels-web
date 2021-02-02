@@ -229,7 +229,7 @@ function init(wsServer, path) {
                         countPoints(state.characterRoles[2]);
                     }
 
-                    room.buildDistincts = 1;
+                    room.buildDistricts = 1;
                     room.tookResource = false;
                     room.forgeryAction = true;
                     room.laboratoryAction = true;
@@ -266,7 +266,7 @@ function init(wsServer, path) {
                         case 7:
                             room.playerHand[room.currentPlayer] += 2;
                             players[room.currentPlayer].hand.push(...state.districtDeck.splice(0, 2));
-                            room.buildDistincts = 3;
+                            room.buildDistricts = 3;
                             countPoints(room.currentPlayer);
                             break;
                         case 8:
@@ -326,7 +326,7 @@ function init(wsServer, path) {
                     hqtypes.map(hqtype => {
                         let acc = {4: 0, 5: 0, 6: 0, 8: 0, 9: 0};
                         let bonusPoints = 0;
-                        room.playerDistricts[slot].map(card => card.type === "haunted_quarter" ? hqtype : utils.distincts[card.type].type)
+                        room.playerDistricts[slot].map(card => card.type === "haunted_quarter" ? hqtype : utils.districts[card.type].type)
                             .reduce((acc, current) => {
                                 acc[current]++;
                                 return acc;
@@ -345,7 +345,7 @@ function init(wsServer, path) {
                         districtsCount++;
                     return districtsCount;
                 },
-                getDistrictCost = (card) => utils.distincts[card.type].cost
+                getDistrictCost = (card) => utils.districts[card.type].cost
                     + (card.decoration ? 1 : 0) + (card.exposition ? card.exposition.length : 0),
                 include = (slot, card) => room.playerDistricts[slot].some(building => building.type === card),
                 includeHand = (slot, card) => players[slot].hand.some(building => building.type === card),
@@ -355,18 +355,18 @@ function init(wsServer, path) {
                     const
                         building = players[slot].hand[cardInd],
                         districts = room.playerDistricts[slot];
-                    if (!(room.buildDistincts || building.type === "stable")) return;
+                    if (!(room.buildDistricts || building.type === "stable")) return;
                     if (building.type === "monument" && districts.length + 2 >= state.maxDistricts)
                         return sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
                     if (building.type === "secret_vault")
                         return sendSlot(slot, "message", "Вы не можете построить Тайное убежище");
                     if (include(slot, building.type) && !include(slot, "quarry"))
                         return sendSlot(slot, "message", 'У вас уже есть такой квартал');
-                    const cost = getDistrictCost(building) - include(slot, "factory") * (utils.distincts[building.type].type === 9);
+                    const cost = getDistrictCost(building) - include(slot, "factory") * (utils.districts[building.type].type === 9);
                     if (!noRequireGold && room.playerGold[slot] < cost)
                         return sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
                     if (building.type !== "stable")
-                        room.buildDistincts -= 1;
+                        room.buildDistricts -= 1;
                     if (!noRequireGold)
                         room.playerGold[slot] -= cost;
                     districts.push(...players[slot].hand.splice(cardInd, 1));
@@ -505,7 +505,7 @@ function init(wsServer, path) {
                 "take-income": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction) {
                         room.incomeAction = false;
-                        let income = room.playerDistricts[slot].map(card => utils.distincts[card.type].type)
+                        let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
                                 .filter(type => type === room.currentCharacter).length
                             + include(slot, "school_of_magic");
                         room.playerGold[slot] += income;

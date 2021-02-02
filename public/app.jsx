@@ -326,9 +326,9 @@ class Game extends React.Component {
         } else if (this.state.userAction === "necropolis") {
         } else {
             const cardType = this.state.player.hand[cardInd].type;
-            if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistincts)
+            if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts)
                 this.setUserAction("necropolis");
-            else if (cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistincts)
+            else if (cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts)
                 this.setUserAction("den_of_thieves");
             else
                 this.socket.emit('build', cardInd);
@@ -700,7 +700,7 @@ class Game extends React.Component {
                                         {magicianAction ?
                                             <button onClick={() => this.setUserAction("magician")}>Сбросить
                                                 карты</button> : null}
-                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistincts) ?
+                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts) ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}
                                         {(this.hasDistricts('museum') && data.player.hand.length && data.museumAction) ?
