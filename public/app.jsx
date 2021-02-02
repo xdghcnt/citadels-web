@@ -335,6 +335,10 @@ class Game extends React.Component {
         }
     }
 
+    handleMagician(slot, cards) {
+        this.socket.emit('exchange-hand', slot, cards)
+    }
+
     handleTheater(slot) {
         this.socket.emit('theater-action', slot)
     }
@@ -678,7 +682,7 @@ class Game extends React.Component {
                                     <div className="choose-character">
                                         <p className="status-text">Выберите персонажа для убийства</p>
                                         <div className="cards-list">
-                                            {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || id === 1)).map((card, id) => (
+                                            {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.characterInGame.indexOf(id) < 1)).map((card, id) => (
                                                 <Card key={id} card={card} type="character" game={this}
                                                       onClick={() => this.handleAssassined(card)}/>
                                             ))}
@@ -690,7 +694,7 @@ class Game extends React.Component {
                                         <p className="status-text" className="status-text">Выберите персонажа для
                                             воровства</p>
                                         <div className="cards-list">
-                                            {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id || id < 3))
+                                            {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.assassined === id || data.characterInGame.indexOf(id) < 2))
                                                 .map((card, id) => (
                                                     <Card key={id} card={card} type="character" game={this}
                                                           onClick={() => this.handleRob(card)}/>
