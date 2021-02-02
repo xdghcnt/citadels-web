@@ -326,9 +326,9 @@ class Game extends React.Component {
         } else if (this.state.userAction === "necropolis") {
         } else {
             const cardType = this.state.player.hand[cardInd].type;
-            if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts)
+            if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts > 0)
                 this.setUserAction("necropolis");
-            else if (cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts)
+            else if (cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts > 0)
                 this.setUserAction("den_of_thieves");
             else
                 this.socket.emit('build', cardInd);
@@ -337,6 +337,10 @@ class Game extends React.Component {
 
     handleMagician(slot, cards) {
         this.socket.emit('exchange-hand', slot, cards)
+    }
+
+    handleNavigatorResource(res) {
+        this.socket.emit('navigator-resources', res)
     }
 
     handleTheater(slot) {
@@ -421,7 +425,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", //"2_2", "3_2", "4_2", "5_2", "6_2", "7_2", "8_2", ...getNineCharacterAvailable(2),
+                        "1_2", "6_2", "7_2" //"2_2", "3_2", "4_2", "5_2", "8_2", ...getNineCharacterAvailable(2),
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
@@ -558,6 +562,7 @@ class Game extends React.Component {
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             notEnoughPlayers = data.phase === 0 && playerCount < 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
+            navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
             necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
             denOfThievesAction = data.player && data.userAction === 'den_of_thieves' && data.phase === 2;
@@ -725,12 +730,20 @@ class Game extends React.Component {
                                         {!data.tookResource ?
                                             <button onClick={() => this.handleTakeResource('card')}>Взять
                                                 карту</button> : null}
-                                        {data.witchedstate == 2 && data.witched == data.currentCharacter ? null : 
-                                        <div>
                                         {magicianAction ?
                                             <button onClick={() => this.setUserAction("magician")}>Сбросить
                                                 карты</button> : null}
-                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts) ?
+                                        {navigatorAction ?
+                                            <button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
+                                            монеты</button> : null}
+                                        {navigatorAction ?
+                                            <span className="button-or">
+                                                или
+                                            </span> : null}
+                                        {navigatorAction ?
+                                            <button onClick={() => this.handleNavigatorResource('card')}>Получить
+                                                4 карты</button> : null}        
+                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0) ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}
                                         {(this.hasDistricts('museum') && data.player.hand.length && data.museumAction) ?
@@ -746,10 +759,7 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleForgery()}>Исп. Кузницу</button> : null}
                                         {data.incomeAction ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
-                                                доход</button> : null}
-                                        </div>
-                                        }
-                                       
+                                                доход</button> : null}                                    
                                         {data.tookResource ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>

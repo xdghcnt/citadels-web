@@ -254,6 +254,7 @@ function init(wsServer, path) {
                     room.forgeryAction = true;
                     room.laboratoryAction = true;
                     room.museumAction = true;
+                    state.alchemistCoins = 0;
                     switch (room.currentCharacter) {
                         case "4_1":
                         case "4_2":
@@ -292,6 +293,10 @@ function init(wsServer, path) {
                             players[room.currentPlayer].hand.push(...state.districtDeck.splice(0, 2));
                             room.buildDistricts = 3;
                             countPoints(room.currentPlayer);
+                            break;
+                        case "7_2":
+                            players[room.currentPlayer].action = 'navigator-action';
+                            room.buildDistricts = -1;
                             break;
                         case "8_1":
                             players[room.currentPlayer].action = 'warlord-action';
@@ -401,6 +406,7 @@ function init(wsServer, path) {
                     const
                         building = players[slot].hand[cardInd],
                         districts = room.playerDistricts[slot];
+                    if (room.buildDistricts == -1) return;
                     if (!(room.buildDistricts || building.type === "stable")) return;
                     if (building.type === "monument" && districts.length + 2 >= state.maxDistricts)
                         return sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
@@ -413,8 +419,10 @@ function init(wsServer, path) {
                         return sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
                     if (building.type !== "stable")
                         room.buildDistricts -= 1;
-                    if (!noRequireGold)
+                    if (!noRequireGold) {
                         room.playerGold[slot] -= cost;
+                        state.alchemistCoins += cost;
+                    }
                     districts.push(...players[slot].hand.splice(cardInd, 1));
                     room.playerHand[slot] -= 1;
                     if (replaceCardInd !== undefined)
@@ -563,7 +571,7 @@ function init(wsServer, path) {
                     }
                 },
                 "build": (slot, cardInd) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && players[slot].hand[cardInd] && room.buildDistricts > -1)
+                    if (room.phase === 2 && slot === room.currentPlayer && players[slot].hand[cardInd])
                         build(slot, cardInd);
                 },
                 "kill-character": (slot, char) => {
@@ -612,6 +620,21 @@ function init(wsServer, path) {
                             sendStateSlot(slot);
                             sendStateSlot(slot_d);
                         }
+                    }
+                },
+                "navigator-resources": (slot, res) => {
+                    if (room.phase === 2 && players[slot].action === 'navigator-action' && ~['coins', 'card'].indexOf(res)) {
+                        players[slot].action = null;
+                        if (res === 'coins') {
+                            room.playerGold[slot] += 4;
+                        } else {
+                            if (!state.districtDeck.length) return players[slot].action = 'navigator-action';
+                            players[slot].hand.push(...state.districtDeck.splice(0,4));
+                            room.playerHand[slot] += 4;
+                        }
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
                     }
                 },
                 "destroy": (slot, slot_d, cardInd) => {
@@ -713,7 +736,9 @@ function init(wsServer, path) {
                                 undefined,
                                 true);
                         if (wasBuilt) {
-                            room.playerGold[slot] -= 6 - cardIndexes.length;
+                            const cost = 6 - cardIndexes.length;
+                            room.playerGold[slot] -= cost;
+                            state.alchemistCoins += cost;
                             room.playerHand[slot] -= cardIndexes.length;
                             cardsToDrop.forEach((card, ind) => {
                                 const _ind = players[slot].hand.findIndex(_card => card === _card);
@@ -746,6 +771,8 @@ function init(wsServer, path) {
                                 players[slot].hand.push(...state.districtDeck.splice(0, 2));
                                 room.playerHand[slot] += 2;
                             }
+                            if (room.currentCharacter === "6_2") 
+                                room.playerGold[slot] += state.alchemistCoins;
                         }
                         players[slot].action = null;
                         players[slot].artistAction = undefined;
