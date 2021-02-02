@@ -1099,3 +1099,8 @@ button {
 .district-slot.selected .card-item {
     filter: none;
 }
+
+button.inactive {
+    background: #bfbbb0;
+    color: #7b7b7b;
+}

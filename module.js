@@ -350,7 +350,7 @@ function init(wsServer, path) {
                     if (!([8, 9].includes(characters.length) && characters.every((character, index) => {
                         //const match = character.match(/^([1-9])_([1-3])$/); 3 char packs
                         const match = character.match(/^([1-9])_([1-2])$/); //2 char packs
-                        return match && match[1] === (index + 1);
+                        return match && +match[1] === (index + 1);
                     })))
                         return false;
                     else {
@@ -363,6 +363,10 @@ function init(wsServer, path) {
                             return false;
                         return true;
                     }
+                },
+                isDistrictsValid = (districts) => {
+                    if (districts.length === (new Set(districts)).size && districts.every((districts) => room.uniqueDistricts.includes(districts)))
+                        return true;
                 },
                 includeHand = (slot, card) => players[slot].hand.some(building => building.type === card),
                 getPlayerDistrictIndex = (slot, card) => room.playerDistricts[slot].findIndex((it) => it.type === card),
@@ -706,7 +710,7 @@ function init(wsServer, path) {
             this.userEventHandlers = {
                 ...this.eventHandlers,
                 "start-game": (user, characters, districts) => {
-                    if (user === room.hostId && characters && characters.length && isCharactersValid(characters)) {
+                    if (user === room.hostId && characters && characters.length && isCharactersValid(characters) && isDistrictsValid(districts)) {
                         room.characterInGame = characters;
                         startGame(districts);
                     }
