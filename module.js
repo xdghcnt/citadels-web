@@ -155,6 +155,7 @@ function init(wsServer, path) {
                     state.trueBlackmailed = null;
                     room.witchedstate = 0;
                     state.emperorAction = false;
+                    room.tax = 0;
                     room.currentPlayer = room.king;
                     players[room.currentPlayer].action = 'choose';
                     players[room.currentPlayer].choose = state.characterDeck;
@@ -362,6 +363,11 @@ function init(wsServer, path) {
                                 }
                             }
                             break;
+                        case "9_3":
+                            room.playerGold[room.currentPlayer] += room.tax;
+                            room.tax = 0;
+                            countPoints(room.currentPlayer);
+                            break;
                     }
                     update();
                     sendStateSlot(room.currentPlayer);
@@ -514,6 +520,10 @@ function init(wsServer, path) {
                     room.playerHand[slot] -= 1;
                     if (replaceCardInd !== undefined)
                         destroy(slot, replaceCardInd);
+                    if (room.characterInGame[8] === "9_3" && room.currentCharacter !== "9_3" && room.playerGold[slot]) {
+                        room.playerGold[slot] -= 1;
+                        room.tax += 1;
+                    }
                     if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
                         room.ender = slot;
                     countPoints(slot);

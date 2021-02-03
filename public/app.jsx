@@ -126,6 +126,9 @@ class Card extends React.Component {
                 {card !== "0_1" ? (<div className={`card-item-zoomed`}
                                         style={{"background-image": backgroundImageZoomed}}/>) : ""}
                 {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
+                {card === "9_3" && isToken && game.state.tax ? <div className="exposition-count">
+                    <div className="decoration-coin"></div>{game.state.tax}
+                </div> : ""}
                 {card.exposition ? <div className="exposition-count">
                     <i className="material-icons">content_copy</i> {card.exposition.length}
                 </div> : ""}
@@ -532,7 +535,7 @@ class Game extends React.Component {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
                         "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getQueenAvailable(),
-                        "4_3", "6_3", "7_3", "8_3"//"1_3", "2_3", "3_3", "5_3", ...getNineCharacterAvailable(3)
+                        "4_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3) //"1_3", "2_3", "3_3", "5_3"
                     ],
                     charactersSelected: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterSelected(1)
