@@ -101,14 +101,16 @@ class Card extends React.Component {
             }.jpg)`,
             backgroundImage = getBackgroundImage(isToken),
             backgroundImageZoomed = getBackgroundImage(),
-            cardChosen = game.state.cardChosen.includes(this.props.id),
+            cardChosen = !this.props.play && game.state.cardChosen.includes(this.props.id),
             blackmailedChosen = game.state.cardChosen.includes(card) && !isToken,
+            diplomatCard = game.state.player && game.state.player.action === 'diplomat-action' && this.props.play && !isCharacter
+                && game.state.cardChosen[0] === this.props.slot && game.state.cardChosen[1] === this.props.id,
             currentCharacter = game.state.currentCharacter === card && isToken,
             isSecretVault = card === "secret_vault";
-
+            
         return (
             <div className={cs(type, "card-item", {
-                "card-chosen": cardChosen || blackmailedChosen,
+                "card-chosen": cardChosen || blackmailedChosen || diplomatCard,
                 "card-wizard": card.wizard,
                 "current-character": currentCharacter,
                 "secret-vault": isSecretVault,
@@ -210,7 +212,7 @@ class PlayerSlot extends React.Component {
                     <div className="districts-bg"/>
                     <div className='cards-list'>
                         {districts && districts.map((card, id) => (
-                            <Card key={id} card={card} type="card" game={game}
+                            <Card key={id} id={id} card={card} type="card" game={game} slot={slot} play={true}
                                   onClick={() => game.handleClickBuilding(slot, id)}/>
                         ))}
                     </div>
@@ -464,6 +466,21 @@ class Game extends React.Component {
     }
 
     handleClickBuilding(slot, card) {
+        if (this.state.player.action === 'diplomat-action') {
+            if (!this.state.cardChosen.length) 
+                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] }));
+            if (slot === this.state.userSlot && slot === this.state.cardChosen[0])
+                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] })); 
+            if (slot !== this.state.userSlot && this.state.userSlot !== this.state.cardChosen[0]) 
+                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] }));
+            
+            if (this.state.cardChosen[0] === this.state.userSlot) 
+                this.socket.emit('exchange-districts', this.state.cardChosen[1], slot, card);
+            else 
+                this.socket.emit('exchange-districts', card, this.state.cardChosen[0], this.state.cardChosen[1]);
+            this.handleStopUserAction(); 
+            return; 
+        }
         if (this.state.userAction === 'arsenal') {
             this.socket.emit("arsenal-destroy", slot, card);
             this.handleStopUserAction();
@@ -504,7 +521,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", ...getQueenAvailable(), //"8_2",
+                        "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getQueenAvailable(),
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
