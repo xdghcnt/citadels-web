@@ -321,7 +321,9 @@ class Game extends React.Component {
     handleTakeCard(card) {
         this.state.player.action === 'wizard-card-action' ?
             this.socket.emit("wizard-choose-card", card) :
-            this.socket.emit("take-card", card);
+            this.state.player.action === 'scholar-response' ?
+                this.socket.emit("scholar-response", card) :  
+                this.socket.emit("take-card", card);
     }
 
     handleTakeIncome() {
@@ -408,6 +410,10 @@ class Game extends React.Component {
 
     handleNavigatorResource(res) {
         this.socket.emit('navigator-resources', res)
+    }
+
+    handleScholar() {
+        this.socket.emit('scholar-action')
     }
 
     handleTheater(slot) {
@@ -526,7 +532,7 @@ class Game extends React.Component {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
                         "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getQueenAvailable(),
-                        "4_3", "6_3", "8_3"//"1_3", "2_3", "3_3", "4_3", "5_3", "7_3", ...getNineCharacterAvailable(3)
+                        "4_3", "6_3", "7_3", "8_3"//"1_3", "2_3", "3_3", "5_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterSelected(1)
@@ -854,6 +860,8 @@ class Game extends React.Component {
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('card')}>Получить
                                                 4 карты</button> : null}
+                                        {this.state.player.action === 'scholar-action' ?
+                                            <button onClick={() => this.handleScholar()}>Раскопать карту</button> : null}
                                         {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0) ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}

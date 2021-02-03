@@ -335,6 +335,10 @@ function init(wsServer, path) {
                             players[room.currentPlayer].action = 'navigator-action';
                             room.buildDistricts = -1;
                             break;
+                        case "7_3":
+                            players[room.currentPlayer].action = 'scholar-action';
+                            room.buildDistricts = 2;
+                            break;
                         case "8_1":
                             players[room.currentPlayer].action = 'warlord-action';
                             break;
@@ -630,7 +634,7 @@ function init(wsServer, path) {
                     }
                 },
                 "take-card": (slot, cardInd) => {
-                    if (room.phase === 3 && slot === room.currentPlayer && ~players[slot].choose[cardInd] && players[slot].action !== 'wizard-card-action') {
+                    if (room.phase === 3 && slot === room.currentPlayer && ~players[slot].choose[cardInd] && ['wizard-card-action', 'scholar-response'].includes(players[slot].action)) {
                         players[slot].hand.push(...players[slot].choose.splice(cardInd, 1));
                         state.districtDeck.push(...players[slot].choose.splice(0));
                         room.playerHand[slot] += 1;
@@ -864,6 +868,28 @@ function init(wsServer, path) {
                         countPoints(slot);
                         update();
                         sendStateSlot(slot);
+                    }
+                },
+                "scholar-action": (slot) => {
+                    if (room.phase === 2 && players[slot].action === 'scholar-action') {
+                        const cardsToTake = state.districtDeck.splice(0, 7);
+                        players[slot].choose = cardsToTake;
+                        room.phase = 3;
+                        players[slot].action = 'scholar-response';
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "scholar-response": (slot, cardInd) => {
+                    if (room.phase === 3 && slot === room.currentPlayer && ~players[slot].choose[cardInd] && players[slot].action === 'scholar-response') {
+                        players[slot].hand.push(...players[slot].choose.splice(cardInd, 1));
+                        state.districtDeck.push(...players[slot].choose.splice(0));
+                        room.playerHand[slot] += 1;
+                        room.phase = 2;
+                        players[slot].action = null;
+                        countPoints(slot);
+                        sendStateSlot(slot);
+                        update();
                     }
                 },
                 "destroy": (slot, slot_d, cardInd) => {
