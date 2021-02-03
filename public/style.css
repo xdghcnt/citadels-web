@@ -696,15 +696,15 @@ button {
     margin-right: 21px;
 }
 
-.status > * {
+.status svg {
     width: 50px;
     height: 50px;
     pointer-events: none;
 }
 
-.status.blackmailed > * {
-    width: 35px;
-    height: 35px;
+.status.blackmailed svg {
+    width: 40px;
+    height: 40px;
 }
 
 .status.assassined + .character {
@@ -1134,12 +1134,12 @@ button.inactive {
 }
 
 .status.blackmailed {
-    margin-left: 13px;
-    color: #f0930a !important;
-    margin-top: 9px;
+    margin-left: 10px;
+    color: #ff948f !important;
+    margin-top: 7px;
 }
 
 .status.witched {
     right: 8px;
-    color: #aa347c !important;
+    color: #ca74a8 !important;
 }
