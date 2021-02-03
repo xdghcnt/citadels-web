@@ -525,7 +525,7 @@ class Game extends React.Component {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
                         "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getQueenAvailable(),
-                        //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
+                        "4_3", "6_3"//"1_3", "2_3", "3_3", "4_3", "5_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterSelected(1)

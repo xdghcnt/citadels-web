@@ -282,9 +282,12 @@ function init(wsServer, path) {
                         case "4_3":
                         case "5_1":
                         case "5_2":
+                        case "5_3":                            
                         case "6_1":
+                        case "6_3":
                         case "8_1":
                         case "8_2":
+                        case "8_3":
                             room.incomeAction = true;
                             break;
                         default:
@@ -450,8 +453,8 @@ function init(wsServer, path) {
                 include = (slot, card) => room.playerDistricts[slot].some(building => building.type === card),
                 isCharactersValid = (characters) => {
                     if (!([8, 9].includes(characters.length) && characters.every((character, index) => {
-                        //const match = character.match(/^([1-9])_([1-3])$/); 3 char packs
-                        const match = character.match(/^([1-9])_([1-2])$/); //2 char packs
+                        const match = character.match(/^([1-9])_([1-3])$/); //3 char packs
+                        //const match = character.match(/^([1-9])_([1-2])$/); //2 char packs
                         return match && +match[1] === (index + 1);
                     })))
                         return false;
@@ -482,7 +485,8 @@ function init(wsServer, path) {
                         building = players[slot].hand[cardInd],
                         districts = room.playerDistricts[slot];
                     if (room.buildDistricts == -1) return;
-                    if (!(room.buildDistricts || building.type === "stable" || building.wizard)) return;
+                    if (!(room.buildDistricts || building.type === "stable" || building.wizard 
+                        || (building.kind === 6 && room.currentCharacter === "6_3"))) return;
                     if (building.type === "monument" && districts.length + 2 >= state.maxDistricts)
                         return sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
                     if (building.type === "secret_vault")
@@ -492,7 +496,7 @@ function init(wsServer, path) {
                     const cost = getDistrictCost(building) - include(slot, "factory") * (utils.districts[building.type].type === 9);
                     if (!noRequireGold && room.playerGold[slot] < cost)
                         return sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
-                    if (building.type !== "stable" || building.wizard)
+                    if (building.type !== "stable" && !building.wizard && !(building.kind === 6 && room.currentCharacter === "6_3"))
                         room.buildDistricts -= 1;
                     delete players[slot].hand[cardInd].wizard;
                     if (!noRequireGold) {
