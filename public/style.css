@@ -447,6 +447,11 @@ body {
     /* border: 1px solid red; */
 }
 
+.card-wizard {
+    box-shadow: inset 0 0 8px 1px blue;
+    /* border: 1px solid red; */
+}
+
 .card.decoration {
     border: 1px solid orange;
     box-shadow: inset 0 0 8px 1px orange;

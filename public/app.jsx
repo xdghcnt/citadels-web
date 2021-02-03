@@ -101,14 +101,16 @@ class Card extends React.Component {
             }.jpg)`,
             backgroundImage = getBackgroundImage(isToken),
             backgroundImageZoomed = getBackgroundImage(),
-            cardChosen = game.state.cardChosen.includes(this.props.id),
+            cardChosen = this.props.play === undefined && game.state.userAction != null && game.state.cardChosen.includes(this.props.id),
             blackmailedChosen = game.state.cardChosen.includes(card) && !isToken,
+            diplomatCard = game.state.player && game.state.player.action === 'diplomat-action' && this.props.play && !isCharacter
+                && game.state.cardChosen[0] === this.props.slot && game.state.cardChosen[1] === this.props.id,
             currentCharacter = game.state.currentCharacter === card && isToken,
             isSecretVault = card === "secret_vault";
-
         return (
             <div className={cs(type, "card-item", {
-                "card-chosen": cardChosen || blackmailedChosen,
+                "card-chosen": cardChosen || blackmailedChosen || diplomatCard,
+                "card-wizard": card.wizard,
                 "current-character": currentCharacter,
                 "secret-vault": isSecretVault,
                 "decoration": card.decoration,
@@ -143,6 +145,7 @@ class PlayerSlot extends React.Component {
             character = player === data.userId && data.player ? data.player.character : data.playerCharacter[slot],
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5  && data.playerChosen === null,
+            wizardAction = data.player && data.player.action === 'wizard-player-action' && data.phase === 2,
             emperorAction = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2 && data.playerChosen === null,
             abbatAction = data.player && data.player.action === 'abbat-action' && data.phase === 2,
             maxMoney = Math.max(...Object.values(data.playerGold)),
@@ -179,6 +182,9 @@ class PlayerSlot extends React.Component {
                         {theaterAction && slot != data.userSlot ?
                             <button onClick={() => game.handleTheater(slot, [])}>Обменяться персонажем</button>
                             : null}
+                        {wizardAction && slot != data.userSlot && data.playerHand[slot] ?
+                            <button onClick={() => game.handleWizard(slot)}>Отобрать карту</button>
+                            : null}
                         {emperorAction && slot != data.userSlot && slot != data.king ?
                             <button onClick={() => game.handleEmperor(slot, null)}>Отдать корону</button>
                             : null}
@@ -205,7 +211,7 @@ class PlayerSlot extends React.Component {
                     <div className="districts-bg"/>
                     <div className='cards-list'>
                         {districts && districts.map((card, id) => (
-                            <Card key={id} card={card} type="card" game={game}
+                            <Card key={id} id={id} card={card} type="card" game={game} slot={slot} play={true}
                                   onClick={() => game.handleClickBuilding(slot, id)}/>
                         ))}
                     </div>
@@ -313,7 +319,9 @@ class Game extends React.Component {
     }
 
     handleTakeCard(card) {
-        this.socket.emit("take-card", card);
+        this.state.player.action === 'wizard-card-action' ?
+            this.socket.emit("wizard-choose-card", card) :
+            this.socket.emit("take-card", card);
     }
 
     handleTakeIncome() {
@@ -368,8 +376,16 @@ class Game extends React.Component {
         this.socket.emit('blackmailed-response', res)
     }
 
+    handleBlackmailedOpen(res) {
+        this.socket.emit('blackmailed-open', res)
+    }
+
     handleMagician(slot, cards) {
         this.socket.emit('exchange-hand', slot, cards)
+    }
+
+    handleWizard(slot) {
+        this.socket.emit('wizard-choose-player', slot)
     }
 
     handleEmperor(slot, res) {
@@ -453,13 +469,28 @@ class Game extends React.Component {
     }
 
     handleClickBuilding(slot, card) {
+        if (this.state.player.action === 'diplomat-action') {
+            if (!this.state.cardChosen.length) 
+                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] }));
+            if (slot === this.state.userSlot && slot === this.state.cardChosen[0])
+                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] })); 
+            if (slot !== this.state.userSlot && this.state.userSlot !== this.state.cardChosen[0]) 
+                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] }));
+            
+            if (this.state.cardChosen[0] === this.state.userSlot) 
+                this.socket.emit('exchange-districts', this.state.cardChosen[1], slot, card);
+            else 
+                this.socket.emit('exchange-districts', card, this.state.cardChosen[0], this.state.cardChosen[1]);
+            this.handleStopUserAction(); 
+            return; 
+        }
         if (this.state.userAction === 'arsenal') {
             this.socket.emit("arsenal-destroy", slot, card);
             this.handleStopUserAction();
             return;
         }
         if (this.state.userAction === "necropolis") {
-            this.socket.emit("build-necropolis", slot);
+            this.socket.emit("build-necropolis", card);
             this.handleStopUserAction();
             return;
         }
@@ -493,7 +524,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", "2_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", ...getQueenAvailable(), //"3_2", "8_2",
+                        "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getQueenAvailable(),
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
@@ -630,6 +661,7 @@ class Game extends React.Component {
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             notEnoughPlayers = data.phase === 0 && playerCount < 2,
             blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
+            blackmailedOpenAction = data.player && data.player.action === 'blackmailed-open' && data.phase === 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
             emperorAction = data.player && (data.userAction === 'emperor' || data.player.action === 'emperor-nores-action') && data.phase === 2,
             abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
@@ -800,6 +832,16 @@ class Game extends React.Component {
                                         {blackmailedResponseAction ?
                                             <button onClick={() => this.handleBlackmailedResponse('no')}>Отказаться от
                                                 откупа</button> : null}
+                                        {blackmailedOpenAction ?
+                                            <button onClick={() => this.handleBlackmailedOpen('yes')}>Раскрыть
+                                                шантаж</button> : null}
+                                        {blackmailedOpenAction ?
+                                            <span className="button-or">
+                                                или
+                                            </span> : null}
+                                        {blackmailedOpenAction ?
+                                            <button onClick={() => this.handleBlackmailedOpen('no')}>Оставить
+                                                шантаж в тайне</button> : null}
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
                                                 монеты</button> : null}
@@ -827,7 +869,7 @@ class Game extends React.Component {
                                         {incomeValue ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
                                                 доход ({incomeValue})</button> : null}
-                                        {data.tookResource && !blackmailedResponseAction && !emperorAction ?
+                                        {data.tookResource && !blackmailedResponseAction && !blackmailedOpenAction && !emperorAction ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
