@@ -86,6 +86,17 @@ function init(wsServer, path) {
                     }
                     return slot;
                 },
+                getPrevPlayer = () => {
+                    let slot = room.currentPlayer;
+                    slot--;
+                    while (!players[slot]) {
+                        if (slot < 0)
+                            slot = 7;
+                        else
+                            slot--;
+                    }
+                    return slot;
+                },
                 startGame = (districts) => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
                     if (state.playersCount > 1) {
@@ -301,6 +312,9 @@ function init(wsServer, path) {
                         case "4_2":
                             players[room.currentPlayer].action = 'emperor-action';
                             break;
+                        case "5_2":
+                            players[room.currentPlayer].action = 'abbat-action';
+                            break;
                         case "6_1":
                             room.playerGold[room.currentPlayer] += 1;
                             countPoints(room.currentPlayer);
@@ -322,12 +336,32 @@ function init(wsServer, path) {
                             players[room.currentPlayer].action = 'artist-action';
                             players[room.currentPlayer].artistAction = 2;
                             break;
+                        case "9_2":
+                            const king = room.characterInGame[3];
+                            if (room.assassined !== king && state.characterRoles[`${king}`] !== undefined) {
+                                const kingPlayer = state.characterRoles[`${king}`];
+                                if ([getNextPlayer(), getPrevPlayer()].includes(kingPlayer)) {
+                                    room.playerGold[room.currentPlayer] += 3;
+                                    countPoints(room.currentPlayer);
+                                }
+                            }
+                            break;
                     }
-
                     update();
                     sendStateSlot(room.currentPlayer);
                 },
                 endRound = () => {
+                    if (state.characterRoles["9_2"] !== undefined) {
+                        room.currentPlayer = state.characterRoles["9_2"];
+                        const king = room.characterInGame[3];
+                        if (room.assassined === king && state.characterRoles[`${king}`] !== undefined) {
+                            const kingPlayer = state.characterRoles[`${king}`];
+                            if ([getNextPlayer(), getPrevPlayer()].includes(kingPlayer)) {
+                                room.playerGold[room.currentPlayer] += 3;
+                                countPoints(room.currentPlayer);
+                            }
+                        }
+                    }
                     room.currentCharacter = 0;
                     if (room.assassined === "4_1" && state.characterRoles["4_1"] !== undefined) 
                         room.king = state.characterRoles["4_1"];
@@ -423,6 +457,8 @@ function init(wsServer, path) {
                         else if ([3, 8].includes(playerCount) && !hasNineCharacter)
                             return false;
                         else if (playerCount === 2 && characters.some(char => char === "4_2"))
+                            return false;
+                        else if (playerCount < 5 && characters.some(char => char === "9_2"))
                             return false;
                         return true;
                     }
@@ -591,7 +627,7 @@ function init(wsServer, path) {
                     }
                 },
                 "take-income": (slot) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction) {
+                    if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction && room.currentCharacter !== "5_2") {
                         room.incomeAction = false;
                         let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
                                 .filter(type => type === state.currentIndCharacter).length
@@ -602,6 +638,23 @@ function init(wsServer, path) {
                             players[slot].hand.push(...state.districtDeck.splice(0, income));
                             room.playerHand[slot] += income;
                         }
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "abbat-income": (slot, cards) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction && room.currentCharacter === "5_2") {
+                        let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
+                                .filter(type => type === 5).length
+                            + include(slot, "school_of_magic");
+                        cards = Math.floor(cards);
+                        if (cards > income || cards < 0) return;
+                        const coins = income - cards;
+                        room.playerGold[slot] += coins;
+                        players[slot].hand.push(...state.districtDeck.splice(0, cards));
+                        room.playerHand[slot] += cards;
+                        room.incomeAction = false;
                         countPoints(slot);
                         update();
                         sendStateSlot(slot);
@@ -715,6 +768,19 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                         if (action === 'emperor-action') update();
                         else endRound();
+                    }
+                },
+                "abbat-steal": (slot, slot_d) => {
+                    if (room.phase === 2 && players[slot].action === "abbat-action" && players[slot_d] && slot !== slot_d) {
+                        const maxCoins = Math.max(...Object.values(room.playerGold));
+                        if (room.playerGold[slot] === maxCoins || room.playerGold[slot_d] !== maxCoins) return;
+                        room.playerGold[slot] += 1;
+                        room.playerGold[slot_d] -= 1;
+                        players[slot].action = null;
+                        countPoints(slot);
+                        countPoints(slot_d);
+                        sendStateSlot(slot);
+                        update();
                     }
                 },
                 "navigator-resources": (slot, res) => {
