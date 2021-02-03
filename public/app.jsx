@@ -458,6 +458,9 @@ class Game extends React.Component {
                 getEmperorAvailable = (set) => (playerCount === 2
                     ? []
                     : [`4_2`]),
+                getQueenAvailable = (set) => (playerCount < 5
+                    ? []
+                    : [`9_2`]),
                 getNineCharacterSelected = (set) => ([3, 8].includes(playerCount)
                     ? [`9_${set}`]
                     : []);
@@ -467,7 +470,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", "2_2", ...getEmperorAvailable(), "6_2", "7_2", //"3_2", "5_2", "8_2", ...getNineCharacterAvailable(2),
+                        "1_2", "2_2", ...getEmperorAvailable(), "6_2", "7_2", ...getQueenAvailable(), //"3_2", "5_2", "8_2",
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
@@ -921,7 +924,7 @@ class Game extends React.Component {
                                                 {Array(9).fill(null).map((_, type) => {
                                                         const card = `${type + 1}_${set + 1}`;
                                                         return <div
-                                                            title={!data.createGamePanel.charactersAvailable.includes(card) && card !== "9_1"
+                                                            title={!data.createGamePanel.charactersAvailable.includes(card) && !["9_1", "4_2", "9_2"].includes(card)
                                                                 ? "В разработке" : ""}
                                                             className={cs("character-slot", {
                                                                 available: data.createGamePanel.charactersAvailable.includes(card),
