@@ -309,6 +309,9 @@ function init(wsServer, path) {
                         case "3_1":
                             players[room.currentPlayer].action = 'magician-action';
                             break;
+                        case "3_2":
+                            players[room.currentPlayer].action = 'wizard-player-action';
+                            break;
                         case "4_2":
                             players[room.currentPlayer].action = 'emperor-action';
                             break;
@@ -475,18 +478,19 @@ function init(wsServer, path) {
                         building = players[slot].hand[cardInd],
                         districts = room.playerDistricts[slot];
                     if (room.buildDistricts == -1) return;
-                    if (!(room.buildDistricts || building.type === "stable")) return;
+                    if (!(room.buildDistricts || building.type === "stable" || building.wizard)) return;
                     if (building.type === "monument" && districts.length + 2 >= state.maxDistricts)
                         return sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
                     if (building.type === "secret_vault")
                         return sendSlot(slot, "message", "Вы не можете построить Тайное убежище");
-                    if (include(slot, building.type) && !include(slot, "quarry"))
+                    if (include(slot, building.type) && !(include(slot, "quarry") || room.currentCharacter === "3_2"))
                         return sendSlot(slot, "message", 'У вас уже есть такой квартал');
                     const cost = getDistrictCost(building) - include(slot, "factory") * (utils.districts[building.type].type === 9);
                     if (!noRequireGold && room.playerGold[slot] < cost)
                         return sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
-                    if (building.type !== "stable")
+                    if (building.type !== "stable" || building.wizard)
                         room.buildDistricts -= 1;
+                    delete players[slot].hand[cardInd].wizard;
                     if (!noRequireGold) {
                         room.playerGold[slot] -= cost;
                         state.alchemistCoins += cost;
@@ -615,7 +619,7 @@ function init(wsServer, path) {
                     }
                 },
                 "take-card": (slot, cardInd) => {
-                    if (room.phase === 3 && slot === room.currentPlayer && ~players[slot].choose[cardInd]) {
+                    if (room.phase === 3 && slot === room.currentPlayer && ~players[slot].choose[cardInd] && players[slot].action !== 'wizard-card-action') {
                         players[slot].hand.push(...players[slot].choose.splice(cardInd, 1));
                         state.districtDeck.push(...players[slot].choose.splice(0));
                         room.playerHand[slot] += 1;
@@ -741,6 +745,34 @@ function init(wsServer, path) {
                             sendStateSlot(slot);
                             sendStateSlot(slot_d);
                         }
+                    }
+                },
+                "wizard-choose-player": (slot, slot_d) => {
+                    if (room.phase === 2 && players[slot].action === 'wizard-player-action' && players[slot_d]
+                        && slot != slot_d && players[slot_d].hand.length && state.wizardPlayer == null) {
+                        room.phase = 3;
+                        state.wizardPlayer = slot_d;
+                        players[slot].action = 'wizard-card-action';
+                        players[slot].choose = players[slot_d].hand;
+                        sendStateSlot(slot);
+                        update();
+                    }
+                },
+                "wizard-choose-card": (slot, cardInd) => {
+                    if (room.phase === 3 && slot === room.currentPlayer && ~players[slot].choose[cardInd] 
+                        && players[slot].action === 'wizard-card-action' && state.wizardPlayer != null) {
+                        const card = players[state.wizardPlayer].hand.splice(cardInd, 1)[0];
+                        card.wizard = true;
+                        players[slot].hand.push(card);
+                        room.playerHand[slot] += 1;
+                        room.playerHand[state.wizardPlayer] -= 1;
+                        room.phase = 2;
+                        countPoints(slot);
+                        countPoints(state.wizardPlayer);
+                        sendStateSlot(slot);
+                        sendStateSlot(state.wizardPlayer);
+                        state.wizardPlayer = null;
+                        update();
                     }
                 },
                 "emperor-crown": (slot, slot_d, res) => {
@@ -935,6 +967,7 @@ function init(wsServer, path) {
                             if (room.currentCharacter === "6_2") 
                                 room.playerGold[slot] += state.alchemistCoins;
                         }
+                        players[slot].hand.forEach((card, i) => delete card.wizard);
                         players[slot].action = null;
                         players[slot].artistAction = undefined;
                         countPoints(slot);

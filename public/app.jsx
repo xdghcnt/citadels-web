@@ -109,6 +109,7 @@ class Card extends React.Component {
         return (
             <div className={cs(type, "card-item", {
                 "card-chosen": cardChosen || blackmailedChosen,
+                "card-wizard": card.wizard,
                 "current-character": currentCharacter,
                 "secret-vault": isSecretVault,
                 "decoration": card.decoration,
@@ -143,6 +144,7 @@ class PlayerSlot extends React.Component {
             character = player === data.userId && data.player ? data.player.character : data.playerCharacter[slot],
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5  && data.playerChosen === null,
+            wizardAction = data.player && data.player.action === 'wizard-player-action' && data.phase === 2,
             emperorAction = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2 && data.playerChosen === null,
             abbatAction = data.player && data.player.action === 'abbat-action' && data.phase === 2,
             maxMoney = Math.max(...Object.values(data.playerGold)),
@@ -178,6 +180,9 @@ class PlayerSlot extends React.Component {
                             : null}
                         {theaterAction && slot != data.userSlot ?
                             <button onClick={() => game.handleTheater(slot, [])}>Обменяться персонажем</button>
+                            : null}
+                        {wizardAction && slot != data.userSlot && data.playerHand[slot] ?
+                            <button onClick={() => game.handleWizard(slot)}>Отобрать карту</button>
                             : null}
                         {emperorAction && slot != data.userSlot && slot != data.king ?
                             <button onClick={() => game.handleEmperor(slot, null)}>Отдать корону</button>
@@ -313,7 +318,9 @@ class Game extends React.Component {
     }
 
     handleTakeCard(card) {
-        this.socket.emit("take-card", card);
+        this.state.player.action === 'wizard-card-action' ?
+            this.socket.emit("wizard-choose-card", card) :
+            this.socket.emit("take-card", card);
     }
 
     handleTakeIncome() {
@@ -370,6 +377,10 @@ class Game extends React.Component {
 
     handleMagician(slot, cards) {
         this.socket.emit('exchange-hand', slot, cards)
+    }
+
+    handleWizard(slot) {
+        this.socket.emit('wizard-choose-player', slot)
     }
 
     handleEmperor(slot, res) {
@@ -493,7 +504,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", "2_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", ...getQueenAvailable(), //"3_2", "8_2",
+                        "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", ...getQueenAvailable(), //"8_2",
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
