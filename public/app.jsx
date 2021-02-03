@@ -95,11 +95,14 @@ class Card extends React.Component {
             backgroundImage = getBackgroundImage(isToken),
             backgroundImageZoomed = getBackgroundImage(),
             cardChosen = game.state.cardChosen.includes(this.props.id),
-            currentCharacter = game.state.currentCharacter === card,
+            blackmailedChosen = game.state.cardChosen.includes(card) && !isToken,
+            currentCharacter = game.state.currentCharacter === card && isToken,
             isSecretVault = card === "secret_vault";
+            
         return (
             <div className={cs(type, "card-item", {
-                "card-chosen": cardChosen || currentCharacter,
+                "card-chosen": cardChosen || blackmailedChosen,
+                "current-character": currentCharacter,
                 "secret-vault": isSecretVault,
                 "decoration": card.decoration,
                 "in-action": !isCharacter && game.state.userAction === card.type
@@ -326,17 +329,25 @@ class Game extends React.Component {
         } else if (this.state.userAction === "necropolis") {
         } else {
             const cardType = this.state.player.hand[cardInd].type;
-            if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts)
+            if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts > 0)
                 this.setUserAction("necropolis");
-            else if (cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts)
+            else if (cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts > 0)
                 this.setUserAction("den_of_thieves");
             else
                 this.socket.emit('build', cardInd);
         }
     }
 
+    handleBlackmailedResponse(res) {
+        this.socket.emit('blackmailed-response', res)
+    }
+
     handleMagician(slot, cards) {
         this.socket.emit('exchange-hand', slot, cards)
+    }
+
+    handleNavigatorResource(res) {
+        this.socket.emit('navigator-resources', res)
     }
 
     handleTheater(slot) {
@@ -352,8 +363,15 @@ class Game extends React.Component {
         if (this.state.player.action == 'witch-action') this.socket.emit("bewitch-character", char);
     }
 
-    handleRob(char) {
-        this.socket.emit("rob-character", char);
+    handleActionRank2(char) {
+        if (this.state.player.action == 'thief-action') this.socket.emit("rob-character", char);
+        if (this.state.player.action == 'blackmailer-action') {
+            this.toggleCardChoose(char);
+            if (this.state.cardChosen.length == 2) {
+                this.socket.emit("threat-character", this.state.cardChosen[0], this.state.cardChosen[1]);
+                this.handleStopUserAction();
+            }
+        }
     }
 
     handleApplyAction(slot, cards) {
@@ -421,7 +439,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", //"2_2", "3_2", "4_2", "5_2", "6_2", "7_2", "8_2", ...getNineCharacterAvailable(2),
+                        "1_2", "2_2", "6_2", "7_2" //"3_2", "4_2", "5_2", "8_2", ...getNineCharacterAvailable(2),
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
@@ -557,7 +575,9 @@ class Game extends React.Component {
             isHost = data.hostId === data.userId,
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             notEnoughPlayers = data.phase === 0 && playerCount < 2,
+            blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
+            navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
             necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
             denOfThievesAction = data.player && data.userAction === 'den_of_thieves' && data.phase === 2;
@@ -573,7 +593,7 @@ class Game extends React.Component {
                         .map((value, slot) => !data.teamsLocked ? slot : value) : activeSlots)
                     : activeSlots).map((n) => parseInt(n));
             const districtCardsMinimized = data.player && data.currentPlayer === data.userSlot && ((data.phase === 1)
-                || data.phase == 3 || data.phase === 2 && (['assassin-action', 'thief-action', 'witch-action'].includes(data.player.action)));
+                || data.phase == 3 || data.phase === 2 && (['assassin-action', 'thief-action', 'witch-action', 'blackmailer-action'].includes(data.player.action)));
             const
                 userActionText = {
                     magician: "Выберите карты для сброса",
@@ -598,7 +618,7 @@ class Game extends React.Component {
                                     <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
                                         <div className={cs("status", {
                                             assassined: card === data.assassined || card === data.witched,
-                                            robbed: card === data.robbed
+                                            robbed: card === data.robbed || data.blackmailed.includes(card)
                                         })}>
                                             {card === data.assassined || card === data.witched ?
                                                 <svg width="485pt" height="403pt" viewBox="0 0 485 403" version="1.1"
@@ -623,7 +643,7 @@ class Game extends React.Component {
                                                     </g>
                                                 </svg>
                                                 : null}
-                                            {card === data.robbed ?
+                                            {card === data.robbed || data.blackmailed.includes(card) ?
                                                 <svg width="849pt" height="794pt" viewBox="0 0 849 794" version="1.1"
                                                      xmlns="http://www.w3.org/2000/svg">
                                                     <g id="#000000ff">
@@ -690,15 +710,15 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
-                                {data.phase == 2 && data.player.action === 'thief-action' && !data.userAction ?
+                                {data.phase == 2 && ['thief-action', 'blackmailer-action'].includes(data.player.action) && !data.userAction ?
                                     <div className="status-text" className="choose-character">
-                                        <p className="status-text" className="status-text">Выберите персонажа для
-                                            воровства</p>
+                                        <p className="status-text" className="status-text">Выберите персонажа для {data.player.action === "thief-action" ? "воровства" : 
+                                            data.cardChosen.length == 0 ? "шантажа" : "блефа"}</p>
                                         <div className="cards-list">
                                             {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || [data.assassined, data.witched].includes(id) || data.characterInGame.indexOf(id) < 2))
                                                 .map((card, id) => (
                                                     <Card key={id} card={card} type="character" game={this}
-                                                          onClick={() => this.handleRob(card)}/>
+                                                          onClick={() => this.handleActionRank2(card)}/>
                                                 ))}
                                         </div>
                                     </div>
@@ -725,12 +745,28 @@ class Game extends React.Component {
                                         {!data.tookResource ?
                                             <button onClick={() => this.handleTakeResource('card')}>Взять
                                                 карту</button> : null}
-                                        {data.witchedstate == 2 && data.witched == data.currentCharacter ? null : 
-                                        <div>
                                         {magicianAction ?
                                             <button onClick={() => this.setUserAction("magician")}>Сбросить
                                                 карты</button> : null}
-                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts) ?
+                                        {blackmailedResponseAction ?
+                                            <button onClick={() => this.handleBlackmailedResponse('yes')}>Откупиться от шантажа</button> : null}
+                                        {blackmailedResponseAction ?
+                                            <span className="button-or">
+                                                или
+                                            </span> : null}
+                                        {blackmailedResponseAction ?
+                                            <button onClick={() => this.handleBlackmailedResponse('no')}>Отказаться от откупа</button> : null}
+                                        {navigatorAction ?
+                                            <button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
+                                            монеты</button> : null}
+                                        {navigatorAction ?
+                                            <span className="button-or">
+                                                или
+                                            </span> : null}
+                                        {navigatorAction ?
+                                            <button onClick={() => this.handleNavigatorResource('card')}>Получить
+                                                4 карты</button> : null}        
+                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0) ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}
                                         {(this.hasDistricts('museum') && data.player.hand.length && data.museumAction) ?
@@ -746,11 +782,8 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleForgery()}>Исп. Кузницу</button> : null}
                                         {data.incomeAction ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
-                                                доход</button> : null}
-                                        </div>
-                                        }
-                                       
-                                        {data.tookResource ?
+                                                доход</button> : null}                                    
+                                        {data.tookResource && !blackmailedResponseAction ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
