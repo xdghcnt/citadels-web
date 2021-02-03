@@ -101,13 +101,12 @@ class Card extends React.Component {
             }.jpg)`,
             backgroundImage = getBackgroundImage(isToken),
             backgroundImageZoomed = getBackgroundImage(),
-            cardChosen = !this.props.play && game.state.cardChosen.includes(this.props.id),
+            cardChosen = this.props.play === undefined && game.state.userAction != null && game.state.cardChosen.includes(this.props.id),
             blackmailedChosen = game.state.cardChosen.includes(card) && !isToken,
             diplomatCard = game.state.player && game.state.player.action === 'diplomat-action' && this.props.play && !isCharacter
                 && game.state.cardChosen[0] === this.props.slot && game.state.cardChosen[1] === this.props.id,
             currentCharacter = game.state.currentCharacter === card && isToken,
             isSecretVault = card === "secret_vault";
-            
         return (
             <div className={cs(type, "card-item", {
                 "card-chosen": cardChosen || blackmailedChosen || diplomatCard,

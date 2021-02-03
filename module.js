@@ -396,11 +396,12 @@ function init(wsServer, path) {
                         room.playerCharacter[slot] = [];
                     });
                     let maxPoints = 0;
-                    for (let i = 1; i <= room.characterInGame.length; i++) {
-                        if (state.characterRoles[i] !== null)
-                            if (room.playerScore[state.characterRoles[i]] >= maxPoints) {
-                                maxPoints = room.playerScore[state.characterRoles[i]];
-                                room.winnerPlayer = state.characterRoles[i];
+                    for (let i = 0; i < room.characterInGame.length; i++) {
+                        const role = room.characterInGame[i];
+                        if (state.characterRoles[role] !== null)
+                            if (room.playerScore[state.characterRoles[role]] >= maxPoints) {
+                                maxPoints = room.playerScore[state.characterRoles[role]];
+                                room.winnerPlayer = state.characterRoles[role];
                             }
                     }
                     room.phase = 0;
@@ -846,7 +847,7 @@ function init(wsServer, path) {
                             return sendSlot(slot, "message", 'Вы не можете использовать способность на Форт');
                         const cost = getDistrictCost(building) - 1 + include(slot_d, "great_wall") * (building.type !== "great_wall");
                         if (room.playerGold[slot] < cost)
-                            return sendSlot(slot, "message", `Недостаточно монет ${room.playerGold[slot]}/${cost}).`);
+                            return sendSlot(slot, "message", `Недостаточно монет (${room.playerGold[slot]}/${cost}).`);
                         players[slot].action = null;
                         room.playerGold[slot] -= cost;
                         destroy(slot_d, cardInd);
