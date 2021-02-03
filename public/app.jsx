@@ -89,7 +89,7 @@ class Card extends React.Component {
             isCharacter = type === "character",
             getBackgroundImage = (isToken) => `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
                 isCharacter
-                    ? (card !== 0 ? card : "card_back")
+                    ? (card !== "0_1" ? card : "card_back")
                     : cardType || "card_back"
             }.jpg)`,
             backgroundImage = getBackgroundImage(isToken),
@@ -135,7 +135,9 @@ class PlayerSlot extends React.Component {
             districts = data.playerDistricts[slot],
             character = player === data.userId && data.player ? data.player.character : data.playerCharacter[slot],
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
-            theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
+            theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5  && data.playerChosen === null,
+            emperorAction = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2 && data.playerChosen === null,
+            playerChosen = data.playerChosen === slot,
             score = data.playerScore[slot],
             isMyTurn = slot === data.currentPlayer,
             isWinner = slot === data.winnerPlayer;
@@ -143,6 +145,7 @@ class PlayerSlot extends React.Component {
             <div className={cs(`player-slot`, `player-slot-${slot}`, {
                 "my-turn": isMyTurn,
                 "winner": isWinner,
+                "player-chosen": playerChosen,
                 "hasCrown": data.king == slot
             })}>
                 <div className="profile">
@@ -157,7 +160,7 @@ class PlayerSlot extends React.Component {
                     <div className="characters-list">
                         {character && character.map((card, id) => (
                             <div className="character-container">
-                                <Card key={id} card={card} type="character" game={game}/>
+                                <Card key={id} card={card ? card : `0_1`} type="character" game={game}/>
                             </div>
                         ))}
                         {magicianAction && slot != data.userSlot ?
@@ -165,6 +168,9 @@ class PlayerSlot extends React.Component {
                             : null}
                         {theaterAction && slot != data.userSlot ?
                             <button onClick={() => game.handleTheater(slot, [])}>Обменяться персонажем</button>
+                            : null}
+                        {emperorAction && slot != data.userSlot && slot != data.king ?
+                            <button onClick={() => game.handleEmperor(slot, null)}>Отдать корону</button>
                             : null}
                     </div>
                     {data.playerCharacter[slot] ?
@@ -270,7 +276,8 @@ class Game extends React.Component {
         this.state = {
             inited: false,
             userAction: null,
-            cardChosen: []
+            cardChosen: [],
+            playerChosen: null
         };
     }
 
@@ -346,6 +353,20 @@ class Game extends React.Component {
         this.socket.emit('exchange-hand', slot, cards)
     }
 
+    handleEmperor(slot, res) {
+        if (res === null) {
+            if (this.state.player.action === 'emperor-nores-action')
+                return this.socket.emit('emperor-crown', slot, 'coin');
+            this.setState(Object.assign(this.state, {
+                userAction: 'emperor',
+                playerChosen: slot
+            }));
+        } else {
+            this.socket.emit('emperor-crown', this.state.playerChosen, res);
+            this.handleStopUserAction();
+        }
+    }
+
     handleNavigatorResource(res) {
         this.socket.emit('navigator-resources', res)
     }
@@ -395,14 +416,16 @@ class Game extends React.Component {
     setUserAction(action) {
         this.setState(Object.assign(this.state, {
             userAction: action,
-            cardChosen: []
+            cardChosen: [],
+            playerChosen: null
         }));
     }
 
     handleStopUserAction() {
         this.setState(Object.assign(this.state, {
             userAction: null,
-            cardChosen: []
+            cardChosen: [],
+            playerChosen: null
         }));
     }
 
@@ -410,13 +433,15 @@ class Game extends React.Component {
         if (this.state.userAction === 'arsenal') {
             this.socket.emit("arsenal-destroy", slot, card);
             this.handleStopUserAction();
+            return;
         }
-        if (this.state.player.action === 'warlord-action') this.socket.emit("destroy", slot, card);
-        if (this.state.player.action === 'artist-action') this.socket.emit("beautify", slot, card);
         if (this.state.userAction === "necropolis") {
             this.socket.emit("build-necropolis", slot);
             this.handleStopUserAction();
+            return;
         }
+        if (this.state.player.action === 'warlord-action') return this.socket.emit("destroy", slot, card);
+        if (this.state.player.action === 'artist-action') return this.socket.emit("beautify", slot, card);
     }
 
     handleEndTurn() {
@@ -430,6 +455,9 @@ class Game extends React.Component {
                 getNineCharacterAvailable = (set) => (playerCount === 2
                     ? []
                     : [`9_${set}`]),
+                getEmperorAvailable = (set) => (playerCount === 2
+                    ? []
+                    : [`4_2`]),
                 getNineCharacterSelected = (set) => ([3, 8].includes(playerCount)
                     ? [`9_${set}`]
                     : []);
@@ -439,7 +467,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", "2_2", "6_2", "7_2" //"3_2", "4_2", "5_2", "8_2", ...getNineCharacterAvailable(2),
+                        "1_2", "2_2", ...getEmperorAvailable(), "6_2", "7_2", //"3_2", "5_2", "8_2", ...getNineCharacterAvailable(2),
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
@@ -577,6 +605,7 @@ class Game extends React.Component {
             notEnoughPlayers = data.phase === 0 && playerCount < 2,
             blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
+            emperorAction = data.player && (data.userAction === 'emperor' || data.player.action === 'emperor-nores-action') && data.phase === 2,
             navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
             necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
@@ -601,7 +630,8 @@ class Game extends React.Component {
                     framework: "Выберите карту для постройки",
                     museum: "Выберите карту для музея",
                     necropolis: "Вы можете выбрать квартал для разрушения",
-                    den_of_thieves: "Вы можете выбрать карты для оплаты"
+                    den_of_thieves: "Вы можете выбрать карты для оплаты",
+                    emperor: "Выберите ресурс, за который вы отдадите корону выбранному игроку"
                 }[data.userAction];
             return (
                 <div
@@ -820,7 +850,7 @@ class Game extends React.Component {
                                         {data.incomeAction ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
                                                 доход</button> : null}
-                                        {data.tookResource && !blackmailedResponseAction ?
+                                        {data.tookResource && !blackmailedResponseAction && !emperorAction ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
@@ -851,6 +881,16 @@ class Game extends React.Component {
                                                     onClick={() => this.handleClickBuildForGold()}>
                                                     Построить за золото
                                                 </button> : null}
+                                            {(emperorAction) ?
+                                                <button onClick={() => this.handleEmperor(null, 'coin')}>Получить
+                                                монету</button> : null}
+                                            {(emperorAction) ?
+                                                <span className="button-or">
+                                                    или
+                                                </span> : null}
+                                            {(emperorAction) ?
+                                                <button onClick={() => this.handleEmperor(null, 'card')}>Получить
+                                                    карту</button> : null}
                                         </div>
                                     </div>
                                     : null}

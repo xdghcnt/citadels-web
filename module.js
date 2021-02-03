@@ -125,7 +125,7 @@ function init(wsServer, path) {
                     room.currentCharacter = "0";
                     state.characterDeck = [...room.characterInGame];
                     let discard = state.playersCount + 1 === room.characterInGame.length || state.playersCount < 4 ? 0 : room.characterInGame.length - 2 - state.playersCount;
-                    room.characterFace = utils.shuffle(state.characterDeck.filter(card => card !== 4)).splice(0, discard);
+                    room.characterFace = utils.shuffle(state.characterDeck.filter(card => !["4_1", "4_2", "4_3"].includes(card))).splice(0, discard);
                     state.characterDeck = state.characterDeck.filter(card => !room.characterFace.includes(card));
 
                     let rnd = Math.floor(Math.random() * state.characterDeck.length);
@@ -143,6 +143,7 @@ function init(wsServer, path) {
                     room.blackmailed = [];
                     state.trueBlackmailed = null;
                     room.witchedstate = 0;
+                    state.emperorAction = false;
                     room.currentPlayer = room.king;
                     players[room.currentPlayer].action = 'choose';
                     players[room.currentPlayer].choose = state.characterDeck;
@@ -231,7 +232,7 @@ function init(wsServer, path) {
                     room.laboratoryAction = false;
                     room.museumAction = false;
                     state.startTurn = false;
-                    if (room.currentCharacter === "4_1") room.king = room.currentPlayer;
+                    if (["4_1", "4_3"].includes(room.currentCharacter)) room.king = room.currentPlayer;
                     if (waitToResponse()) {
                         update();
                         sendStateSlot(room.currentPlayer);
@@ -267,6 +268,7 @@ function init(wsServer, path) {
                     switch (room.currentCharacter) {
                         case "4_1":
                         case "4_2":
+                        case "4_3":
                         case "5_1":
                         case "5_2":
                         case "6_1":
@@ -296,6 +298,9 @@ function init(wsServer, path) {
                         case "3_1":
                             players[room.currentPlayer].action = 'magician-action';
                             break;
+                        case "4_2":
+                            players[room.currentPlayer].action = 'emperor-action';
+                            break;
                         case "6_1":
                             room.playerGold[room.currentPlayer] += 1;
                             countPoints(room.currentPlayer);
@@ -323,8 +328,20 @@ function init(wsServer, path) {
                     sendStateSlot(room.currentPlayer);
                 },
                 endRound = () => {
-                    if (room.assassined == "4_1") room.king = state.characterRoles["4_1"];
-                    if (room.ender !== null) return endGame();
+                    room.currentCharacter = 0;
+                    if (room.assassined === "4_1" && state.characterRoles["4_1"] !== undefined) 
+                        room.king = state.characterRoles["4_1"];
+                    if (room.assassined === "4_3" && state.characterRoles["4_3"] !== undefined) 
+                        room.king = state.characterRoles["4_3"];
+                    if (room.assassined === "4_2" && !state.emperorAction && state.characterRoles["4_2"] !== undefined) {
+                        room.currentPlayer = state.characterRoles["4_2"];
+                        players[room.currentPlayer].action = 'emperor-nores-action';
+                        room.playerCharacter[room.currentPlayer][players[room.currentPlayer].character.indexOf("4_2")] = "4_2";
+                        update();
+                        sendStateSlot(room.currentPlayer);
+                        return;
+                    }
+                    if (room.ender != null) return endGame();
                     newRound();
                 },
                 endGame = () => {
@@ -359,6 +376,8 @@ function init(wsServer, path) {
                     room.playerScore[slot] += room.playerHand[slot] * include(slot, "map_room");
                     room.playerScore[slot] += room.playerGold[slot] * include(slot, "imperial_treasury");
                     room.playerScore[slot] += room.playerDistricts[slot].filter(card => getDistrictCost(card) % 2).length * include(slot, "basilica");
+                    const museum = room.playerDistricts[slot].filter(card => card.type === "museum") || {};
+                    room.playerScore[slot] += museum.exposition ? museum.exposition.length : 0;
                     if (include(slot, "memorial") && room.king === slot) room.playerScore[slot] += 5;
 
                     let hqtypes = include(slot, "haunted_quarter") ? [4, 5, 6, 8, 9] : [9];
@@ -386,8 +405,7 @@ function init(wsServer, path) {
                         districtsCount++;
                     return districtsCount;
                 },
-                getDistrictCost = (card) => utils.districts[card.type].cost
-                    + (card.decoration ? 1 : 0) + (card.exposition ? card.exposition.length : 0),
+                getDistrictCost = (card) => utils.districts[card.type].cost + (card.decoration ? 1 : 0),
                 include = (slot, card) => room.playerDistricts[slot].some(building => building.type === card),
                 isCharactersValid = (characters) => {
                     if (!([8, 9].includes(characters.length) && characters.every((character, index) => {
@@ -403,6 +421,8 @@ function init(wsServer, path) {
                         if (playerCount === 2 && hasNineCharacter)
                             return false;
                         else if ([3, 8].includes(playerCount) && !hasNineCharacter)
+                            return false;
+                        else if (playerCount === 2 && characters.some(char => char === "4_2"))
                             return false;
                         return true;
                     }
@@ -576,7 +596,12 @@ function init(wsServer, path) {
                         let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
                                 .filter(type => type === state.currentIndCharacter).length
                             + include(slot, "school_of_magic");
-                        room.playerGold[slot] += income;
+                        if (room.currentCharacter !== "4_3") 
+                            room.playerGold[slot] += income;
+                        else {
+                            players[slot].hand.push(...state.districtDeck.splice(0, income));
+                            room.playerHand[slot] += income;
+                        }
                         countPoints(slot);
                         update();
                         sendStateSlot(slot);
@@ -665,6 +690,33 @@ function init(wsServer, path) {
                         }
                     }
                 },
+                "emperor-crown": (slot, slot_d, res) => {
+                    if (room.phase === 2 && ['emperor-action', 'emperor-nores-action'].includes(players[slot].action) && players[slot_d] 
+                        && slot !== slot_d && room.king !== slot_d && ~['coin', 'card'].indexOf(res)) {
+                        let action = players[slot].action;
+                        if (players[slot].action === 'emperor-action') {
+                            if (res === 'coin' && room.playerGold[slot_d] > 0) {
+                                room.playerGold[slot] += 1;
+                                room.playerGold[slot_d] -= 1;
+                            }
+                            if (res === 'card' && players[slot_d].hand.length) {
+                                let cardInd = Math.floor(Math.random() * players[slot_d].hand.length);
+                                players[slot].hand.push(...players[slot_d].hand.splice(cardInd, 1));
+                                room.playerHand[slot] += 1;
+                                room.playerHand[slot_d] -= 1;
+                                sendStateSlot(slot_d);
+                            }
+                        }
+                        state.emperorAction = true;
+                        room.king = slot_d;
+                        players[slot].action = null;
+                        countPoints(slot);
+                        countPoints(slot_d);
+                        sendStateSlot(slot);
+                        if (action === 'emperor-action') update();
+                        else endRound();
+                    }
+                },
                 "navigator-resources": (slot, res) => {
                     if (room.phase === 2 && players[slot].action === 'navigator-action' && ~['coins', 'card'].indexOf(res)) {
                         players[slot].action = null;
@@ -684,7 +736,7 @@ function init(wsServer, path) {
                     if (room.phase === 2 && players[slot].action === 'warlord-action' && room.playerDistricts[slot_d][cardInd]) {
                         if (state.characterRoles["5_1"] === slot_d && room.assassined !== "5_1" && room.witched !== "5_1")
                             return sendSlot(slot, "message", 'Вы не можете использовать способность на постройках Епископа');
-                        if (state.characterRoles["1_2"] === slot_d && room.witched === "5_1")
+                        if (state.characterRoles["1_2"] === slot_d && room.witched === "5_1" && room.witchedstate === 1)
                             return sendSlot(slot, "message", 'Вы не можете использовать способность на постройках Ведьмы, которая заколдовала Епископа');
                         if (getDistrictsCount(slot_d) >= state.maxDistricts)
                             return sendSlot(slot, "message", 'Вы не можете использовать способность на законченном городе');
@@ -806,7 +858,7 @@ function init(wsServer, path) {
                 },
                 "end-turn": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.tookResource) {
-                        if (['witch-action', 'blackmailed-response'].includes(players[slot].action)) return;
+                        if (['witch-action', 'blackmailed-response', 'emperor-action', 'emperor-nores-action'].includes(players[slot].action)) return;
                         if (room.currentCharacter != "1_2") {
                             if (!room.playerGold[slot] && include(slot, "poor_house"))
                                 room.playerGold[slot] += 1;
