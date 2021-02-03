@@ -106,7 +106,7 @@ class Card extends React.Component {
             diplomatCard = game.state.player && game.state.player.action === 'diplomat-action' && this.props.play && !isCharacter
                 && game.state.cardChosen[0] === this.props.slot && game.state.cardChosen[1] === this.props.id,
             currentCharacter = game.state.currentCharacter === card && isToken,
-            isSecretVault = card === "secret_vault";
+            isSecretVault = card.type === "secret_vault";
         return (
             <div className={cs(type, "card-item", {
                 "card-chosen": cardChosen || blackmailedChosen || diplomatCard,
@@ -126,6 +126,9 @@ class Card extends React.Component {
                 {card !== "0_1" ? (<div className={`card-item-zoomed`}
                                         style={{"background-image": backgroundImageZoomed}}/>) : ""}
                 {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
+                {card === "9_3" && isToken && game.state.tax ? <div className="exposition-count">
+                    <div className="decoration-coin"></div>{game.state.tax}
+                </div> : ""}
                 {card.exposition ? <div className="exposition-count">
                     <i className="material-icons">content_copy</i> {card.exposition.length}
                 </div> : ""}
@@ -321,7 +324,9 @@ class Game extends React.Component {
     handleTakeCard(card) {
         this.state.player.action === 'wizard-card-action' ?
             this.socket.emit("wizard-choose-card", card) :
-            this.socket.emit("take-card", card);
+            this.state.player.action === 'scholar-response' ?
+                this.socket.emit("scholar-response", card) :  
+                this.socket.emit("take-card", card);
     }
 
     handleTakeIncome() {
@@ -410,6 +415,10 @@ class Game extends React.Component {
         this.socket.emit('navigator-resources', res)
     }
 
+    handleScholar() {
+        this.socket.emit('scholar-action')
+    }
+
     handleTheater(slot) {
         this.socket.emit('theater-action', slot)
     }
@@ -495,6 +504,7 @@ class Game extends React.Component {
             return;
         }
         if (this.state.player.action === 'warlord-action') return this.socket.emit("destroy", slot, card);
+        if (this.state.player.action === 'marshal-action') return this.socket.emit("seize-district", slot, card);
         if (this.state.player.action === 'artist-action') return this.socket.emit("beautify", slot, card);
     }
 
@@ -525,7 +535,7 @@ class Game extends React.Component {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
                         "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getQueenAvailable(),
-                        "4_3", "6_3"//"1_3", "2_3", "3_3", "4_3", "5_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
+                        "4_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3) //"1_3", "2_3", "3_3", "5_3"
                     ],
                     charactersSelected: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterSelected(1)
@@ -663,7 +673,8 @@ class Game extends React.Component {
             blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
             blackmailedOpenAction = data.player && data.player.action === 'blackmailed-open' && data.phase === 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
-            emperorAction = data.player && (data.userAction === 'emperor' || data.player.action === 'emperor-nores-action') && data.phase === 2,
+            emperor = data.player && ['emperor-action','emperor-nores-action'].includes(data.player.action) && data.phase === 2,
+            emperorAction = data.player && data.userAction === 'emperor' && data.phase === 2,
             abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
             navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
@@ -852,6 +863,8 @@ class Game extends React.Component {
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('card')}>Получить
                                                 4 карты</button> : null}
+                                        {this.state.player.action === 'scholar-action' ?
+                                            <button onClick={() => this.handleScholar()}>Раскопать карту</button> : null}
                                         {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0) ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}
@@ -869,7 +882,7 @@ class Game extends React.Component {
                                         {incomeValue ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
                                                 доход ({incomeValue})</button> : null}
-                                        {data.tookResource && !blackmailedResponseAction && !blackmailedOpenAction && !emperorAction ?
+                                        {data.tookResource && !blackmailedResponseAction && !blackmailedOpenAction && !emperorAction && !emperor ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
