@@ -643,14 +643,14 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                     }
                 },
-                "abbat-income": (slot, coins) => {
+                "abbat-income": (slot, cards) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction && room.currentCharacter === "5_2") {
                         let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
                                 .filter(type => type === 5).length
                             + include(slot, "school_of_magic");
-                        coins = Math.floor(coins);
-                        if (coins > income || coins < 0) return;
-                        const cards = income - coins;
+                        cards = Math.floor(cards);
+                        if (cards > income || cards < 0) return;
+                        const coins = income - cards;
                         room.playerGold[slot] += coins;
                         players[slot].hand.push(...state.districtDeck.splice(0, cards));
                         room.playerHand[slot] += cards;

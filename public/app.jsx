@@ -321,8 +321,8 @@ class Game extends React.Component {
         this.setUserAction("abbat");
     }
 
-    handleAbbatIncome(coins) {
-        this.socket.emit('abbat-income', coins);
+    handleAbbatIncome(cards) {
+        this.socket.emit('abbat-income', cards);
         this.handleStopUserAction();
     }
 
@@ -658,11 +658,15 @@ class Game extends React.Component {
                     museum: "Выберите карту для музея",
                     necropolis: "Вы можете выбрать квартал для разрушения",
                     den_of_thieves: "Вы можете выбрать карты для оплаты",
-                    emperor: "Выберите ресурс, за который вы отдадите корону выбранному игроку",
-                    abbat: "Выберите получаемые ресурсы"
+                    emperor: "Выберите ресурс, за который вы отдадите корону",
+                    abbat: "Выберите количество дохода, получаемый картами"
                 }[data.userAction];
-            const abbatIncomeValue = data.playerDistricts[data.userSlot] ? data.playerDistricts[data.userSlot].filter(card => card.kind === 5).length
+            let incomeValue = 0;
+            if (data.incomeAction) {
+                const kindIncome = data.currentCharacter.split('_')[0];
+                incomeValue = data.playerDistricts[data.userSlot] ? data.playerDistricts[data.userSlot].filter(card => card.kind === Number(kindIncome)).length
                 + data.playerDistricts[data.userSlot].some(card => card.type === "school_of_magic") : 0;
+            }
             return (
                 <div
                     className={cs(`game`, {
@@ -820,9 +824,9 @@ class Game extends React.Component {
                                                 Арсенал</button> : null}
                                         {this.hasDistricts('forgery') && data.playerGold[data.userSlot] > 1 && data.forgeryAction ?
                                             <button onClick={() => this.handleForgery()}>Исп. Кузницу</button> : null}
-                                        {data.incomeAction ?
+                                        {incomeValue ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
-                                                доход</button> : null}
+                                                доход ({incomeValue})</button> : null}
                                         {data.tookResource && !blackmailedResponseAction && !emperorAction ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
@@ -864,10 +868,9 @@ class Game extends React.Component {
                                             {(emperorAction) ?
                                                 <button onClick={() => this.handleEmperor(null, 'card')}>Получить
                                                     карту</button> : null}
-                                            {(abbatIncome && abbatIncomeValue) ?
-                                            ([...Array(abbatIncomeValue + 1).keys()].map((i) => (
-                                                    <button onClick={() => this.handleAbbatIncome(i)}>Получить 
-                                                     {i} монет + {abbatIncomeValue - i} карт</button>))) : null}
+                                            {(abbatIncome && incomeValue) ?
+                                            ([...Array(incomeValue + 1).keys()].map((i) => (
+                                                    <button onClick={() => this.handleAbbatIncome(i)}>{i} к.</button>))) : null}
                                         </div>
                                     </div>
                                     : null}
