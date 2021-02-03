@@ -376,6 +376,10 @@ class Game extends React.Component {
         this.socket.emit('blackmailed-response', res)
     }
 
+    handleBlackmailedOpen(res) {
+        this.socket.emit('blackmailed-open', res)
+    }
+
     handleMagician(slot, cards) {
         this.socket.emit('exchange-hand', slot, cards)
     }
@@ -657,6 +661,7 @@ class Game extends React.Component {
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             notEnoughPlayers = data.phase === 0 && playerCount < 2,
             blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
+            blackmailedOpenAction = data.player && data.player.action === 'blackmailed-open' && data.phase === 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
             emperorAction = data.player && (data.userAction === 'emperor' || data.player.action === 'emperor-nores-action') && data.phase === 2,
             abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
@@ -827,6 +832,16 @@ class Game extends React.Component {
                                         {blackmailedResponseAction ?
                                             <button onClick={() => this.handleBlackmailedResponse('no')}>Отказаться от
                                                 откупа</button> : null}
+                                        {blackmailedOpenAction ?
+                                            <button onClick={() => this.handleBlackmailedOpen('yes')}>Раскрыть
+                                                шантаж</button> : null}
+                                        {blackmailedOpenAction ?
+                                            <span className="button-or">
+                                                или
+                                            </span> : null}
+                                        {blackmailedOpenAction ?
+                                            <button onClick={() => this.handleBlackmailedOpen('no')}>Оставить
+                                                шантаж в тайне</button> : null}
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
                                                 монеты</button> : null}
@@ -854,7 +869,7 @@ class Game extends React.Component {
                                         {incomeValue ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
                                                 доход ({incomeValue})</button> : null}
-                                        {data.tookResource && !blackmailedResponseAction && !emperorAction ?
+                                        {data.tookResource && !blackmailedResponseAction && !blackmailedOpenAction && !emperorAction ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
