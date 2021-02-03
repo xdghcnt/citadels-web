@@ -341,6 +341,9 @@ function init(wsServer, path) {
                         case "8_2":
                             players[room.currentPlayer].action = 'diplomat-action';
                             break;
+                        case "8_3":
+                            players[room.currentPlayer].action = 'marshal-action';
+                            break;
                         case "9_1":
                             players[room.currentPlayer].action = 'artist-action';
                             players[room.currentPlayer].artistAction = 2;
@@ -911,6 +914,37 @@ function init(wsServer, path) {
                         room.playerDistricts[slot].splice(my_d, 1, opp_building);
                         room.playerDistricts[opp].splice(opp_d, 1, my_building);
                         countPoints(opp);
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "seize-district": (slot, slot_d, cardInd) => {
+                    if (room.phase === 2 && players[slot].action === 'marshal-action' && room.playerDistricts[slot_d][cardInd]) {
+                        if (state.characterRoles["5_1"] === slot_d && room.assassined !== "5_1" && room.witched !== "5_1")
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на постройках Епископа');
+                        if (state.characterRoles["1_2"] === slot_d && room.witched === "5_1" && room.witchedstate === 1)
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на постройках Ведьмы, которая заколдовала Епископа');
+                        if (getDistrictsCount(slot_d) >= state.maxDistricts)
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на законченном городе');
+                        const building = room.playerDistricts[slot_d][cardInd];
+                        if (building.type === "keep")
+                            return sendSlot(slot, "message", 'Вы не можете использовать способность на Форт');
+                        if (getDistrictCost(building) > 3)
+                            return sendSlot(slot, "message", 'Вы не можете захватить постройку, которая стоит более 3 монет');
+                        if (include(slot, building.type))
+                            return sendSlot(slot, "message", 'Вы не можете забрать эту постройку себе');
+                        const cost = getDistrictCost(building) + include(slot_d, "great_wall") * (building.type !== "great_wall");
+                        if (room.playerGold[slot] < cost)
+                            return sendSlot(slot, "message", `Недостаточно монет (${room.playerGold[slot]}/${cost}).`);
+                        room.playerDistricts[slot_d].splice(cardInd, 1);
+                        room.playerDistricts[slot].splice(-1, 0, building);
+                        players[slot].action = null;
+                        room.playerGold[slot] -= cost;
+                        room.playerGold[slot_d] += cost;
+                        if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
+                            room.ender = slot;
+                        countPoints(slot_d);
                         countPoints(slot);
                         update();
                         sendStateSlot(slot);
