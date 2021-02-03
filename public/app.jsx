@@ -486,7 +486,7 @@ class Game extends React.Component {
             return;
         }
         if (this.state.userAction === "necropolis") {
-            this.socket.emit("build-necropolis", slot);
+            this.socket.emit("build-necropolis", card);
             this.handleStopUserAction();
             return;
         }
