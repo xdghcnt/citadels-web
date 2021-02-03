@@ -140,6 +140,8 @@ function init(wsServer, path) {
                     room.assassined = null;
                     room.robbed = null;
                     room.witched = null;
+                    room.blackmailed = [];
+                    state.trueBlackmailed = null;
                     room.witchedstate = 0;
                     room.currentPlayer = room.king;
                     players[room.currentPlayer].action = 'choose';
@@ -228,17 +230,24 @@ function init(wsServer, path) {
                     room.forgeryAction = false;
                     room.laboratoryAction = false;
                     room.museumAction = false;
-
+                    state.startTurn = false;
                     if (room.currentCharacter === "4_1") room.king = room.currentPlayer;
-                    if (room.witched === room.currentCharacter && room.witchedstate === 2) {
+                    if (waitToResponse()) {
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else startTurn();
                 },
-                moveToWitch = () => {
-                    room.witchedstate = 1;
-                    room.currentPlayer = state.characterRoles["1_2"];
-                    startTurn();
+                waitToResponse = () => (room.witched === room.currentCharacter && room.witchedstate === 2) || room.blackmailed.includes(room.currentCharacter),
+                moveToResponse = () => {
+                    if (room.witched === room.currentCharacter) {
+                        room.witchedstate = 1;
+                        room.currentPlayer = state.characterRoles["1_2"];
+                        startTurn();
+                    } else if (room.blackmailed.includes(room.currentCharacter)) {
+                        players[room.currentPlayer].action = 'blackmailed-response';
+                        update();
+                        sendStateSlot(room.currentPlayer);
+                    } else startTurn();
                 },
                 startTurn = () => {
                     if (room.robbed === room.currentCharacter) {
@@ -280,6 +289,9 @@ function init(wsServer, path) {
                             break;
                         case "2_1":
                             players[room.currentPlayer].action = 'thief-action';
+                            break;
+                        case "2_2":
+                            players[room.currentPlayer].action = 'blackmailer-action';
                             break;
                         case "3_1":
                             players[room.currentPlayer].action = 'magician-action';
@@ -528,7 +540,7 @@ function init(wsServer, path) {
                             room.playerGold[slot] += 2;
                             if (include(slot, "gold_mine"))
                                 room.playerGold[slot] += 1;
-                            if (room.witched === room.currentCharacter && room.witchedstate === 2) return moveToWitch();
+                            if (waitToResponse()) return moveToResponse();
                         } else {
                             if (!state.districtDeck.length) return;
                             room.tookResource = true;
@@ -554,7 +566,7 @@ function init(wsServer, path) {
                         room.phase = 2;
                         countPoints(slot);
                         sendStateSlot(slot);
-                        if (room.witched === room.currentCharacter && room.witchedstate === 2) return moveToWitch();
+                        if (waitToResponse()) return moveToResponse();
                         update();
                     }
                 },
@@ -597,6 +609,37 @@ function init(wsServer, path) {
                         players[slot].action = null;
                         update();
                         sendStateSlot(slot);
+                    }
+                },
+                "threat-character": (slot, charTrue, charFalse) => {
+                    if (room.phase === 2 && players[slot].action === 'blackmailer-action' && charTrue !== charFalse &&
+                        room.characterInGame.indexOf(charTrue) > 1 && ![room.assassined, room.witched].includes(charTrue) &&
+                        room.characterInGame.indexOf(charFalse) > 1 && ![room.assassined, room.witched].includes(charFalse)) {
+                        room.blackmailed = [charTrue, charFalse].sort((a, b) => room.characterInGame.indexOf(a) - room.characterInGame.indexOf(b));
+                        state.trueBlackmailed = charTrue;
+                        players[slot].action = null;
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "blackmailed-response": (slot, ans) => {
+                    if (room.phase === 2 && players[slot].action === 'blackmailed-response' && ~['yes', 'no'].indexOf(ans)) {
+                        players[slot].action = null;
+                        let gold = 0;
+                        if (ans === 'yes') {
+                            gold = Math.floor(room.playerGold[slot] / 2);
+                        }
+                        else if (state.trueBlackmailed === room.currentCharacter) {
+                            gold = room.playerGold[slot];
+                            room.blackmailed = [];
+                        }
+                        room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
+                        room.playerGold[slot] -= gold;
+                        countPoints(slot);
+                        let thief = room.witched === "2_2" ? "1_2" : "2_2";
+                        room.playerGold[state.characterRoles[thief]] += gold;
+                        countPoints(state.characterRoles[thief]);
+                        startTurn();
                     }
                 },
                 "exchange-hand": (slot, slot_d, cardInds) => {
@@ -763,7 +806,7 @@ function init(wsServer, path) {
                 },
                 "end-turn": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.tookResource) {
-                        if (players[slot].action === 'witch-action') return;
+                        if (['witch-action', 'blackmailed-response'].includes(players[slot].action)) return;
                         if (room.currentCharacter != "1_2") {
                             if (!room.playerGold[slot] && include(slot, "poor_house"))
                                 room.playerGold[slot] += 1;
