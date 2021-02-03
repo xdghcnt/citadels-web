@@ -312,6 +312,9 @@ function init(wsServer, path) {
                         case "4_2":
                             players[room.currentPlayer].action = 'emperor-action';
                             break;
+                        case "5_2":
+                            players[room.currentPlayer].action = 'abbat-action';
+                            break;
                         case "6_1":
                             room.playerGold[room.currentPlayer] += 1;
                             countPoints(room.currentPlayer);
@@ -624,7 +627,7 @@ function init(wsServer, path) {
                     }
                 },
                 "take-income": (slot) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction) {
+                    if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction && room.currentCharacter !== "5_2") {
                         room.incomeAction = false;
                         let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
                                 .filter(type => type === state.currentIndCharacter).length
@@ -635,6 +638,23 @@ function init(wsServer, path) {
                             players[slot].hand.push(...state.districtDeck.splice(0, income));
                             room.playerHand[slot] += income;
                         }
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "abbat-income": (slot, coins) => {
+                    if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction && room.currentCharacter === "5_2") {
+                        let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
+                                .filter(type => type === 5).length
+                            + include(slot, "school_of_magic");
+                        coins = Math.floor(coins);
+                        if (coins > income || coins < 0) return;
+                        const cards = income - coins;
+                        room.playerGold[slot] += coins;
+                        players[slot].hand.push(...state.districtDeck.splice(0, cards));
+                        room.playerHand[slot] += cards;
+                        room.incomeAction = false;
                         countPoints(slot);
                         update();
                         sendStateSlot(slot);
@@ -748,6 +768,19 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                         if (action === 'emperor-action') update();
                         else endRound();
+                    }
+                },
+                "abbat-steal": (slot, slot_d) => {
+                    if (room.phase === 2 && players[slot].action === "abbat-action" && players[slot_d] && slot !== slot_d) {
+                        const maxCoins = Math.max(...Object.values(room.playerGold));
+                        if (room.playerGold[slot] === maxCoins || room.playerGold[slot_d] !== maxCoins) return;
+                        room.playerGold[slot] += 1;
+                        room.playerGold[slot_d] -= 1;
+                        players[slot].action = null;
+                        countPoints(slot);
+                        countPoints(slot_d);
+                        sendStateSlot(slot);
+                        update();
                     }
                 },
                 "navigator-resources": (slot, res) => {

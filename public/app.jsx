@@ -144,6 +144,9 @@ class PlayerSlot extends React.Component {
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5  && data.playerChosen === null,
             emperorAction = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2 && data.playerChosen === null,
+            abbatAction = data.player && data.player.action === 'abbat-action' && data.phase === 2,
+            maxMoney = Math.max(...Object.values(data.playerGold)),
+            isBigMoney = data.playerGold[slot] === maxMoney && data.playerGold[data.userSlot] !== maxMoney,
             playerChosen = data.playerChosen === slot,
             score = data.playerScore[slot],
             isMyTurn = slot === data.currentPlayer,
@@ -178,6 +181,9 @@ class PlayerSlot extends React.Component {
                             : null}
                         {emperorAction && slot != data.userSlot && slot != data.king ?
                             <button onClick={() => game.handleEmperor(slot, null)}>Отдать корону</button>
+                            : null}
+                        {abbatAction && slot != data.userSlot && isBigMoney ?
+                            <button onClick={() => game.handleAbbat(slot)}>Забрать монету</button>
                             : null}
                     </div>
                     {data.playerCharacter[slot] ?
@@ -311,7 +317,13 @@ class Game extends React.Component {
     }
 
     handleTakeIncome() {
-        this.socket.emit('take-income')
+        if (this.state.currentCharacter !== "5_2") return this.socket.emit('take-income');
+        this.setUserAction("abbat");
+    }
+
+    handleAbbatIncome(coins) {
+        this.socket.emit('abbat-income', coins);
+        this.handleStopUserAction();
     }
 
     toggleCardChoose(card) {
@@ -372,6 +384,10 @@ class Game extends React.Component {
             this.socket.emit('emperor-crown', this.state.playerChosen, res);
             this.handleStopUserAction();
         }
+    }
+
+    handleAbbat(slot) {
+        this.socket.emit('abbat-steal', slot)
     }
 
     handleNavigatorResource(res) {
@@ -477,7 +493,7 @@ class Game extends React.Component {
                 createGamePanel: {
                     charactersAvailable: [
                         "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", "2_2", ...getEmperorAvailable(), "6_2", "7_2", ...getQueenAvailable(), //"3_2", "5_2", "8_2",
+                        "1_2", "2_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", ...getQueenAvailable(), //"3_2", "8_2",
                         //"1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
                     ],
                     charactersSelected: [
@@ -616,6 +632,7 @@ class Game extends React.Component {
             blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
             emperorAction = data.player && (data.userAction === 'emperor' || data.player.action === 'emperor-nores-action') && data.phase === 2,
+            abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
             navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
             necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
@@ -641,8 +658,11 @@ class Game extends React.Component {
                     museum: "Выберите карту для музея",
                     necropolis: "Вы можете выбрать квартал для разрушения",
                     den_of_thieves: "Вы можете выбрать карты для оплаты",
-                    emperor: "Выберите ресурс, за который вы отдадите корону выбранному игроку"
+                    emperor: "Выберите ресурс, за который вы отдадите корону выбранному игроку",
+                    abbat: "Выберите получаемые ресурсы"
                 }[data.userAction];
+            const abbatIncomeValue = data.playerDistricts[data.userSlot] ? data.playerDistricts[data.userSlot].filter(card => card.kind === 5).length
+                + data.playerDistricts[data.userSlot].some(card => card.type === "school_of_magic") : 0;
             return (
                 <div
                     className={cs(`game`, {
@@ -844,6 +864,10 @@ class Game extends React.Component {
                                             {(emperorAction) ?
                                                 <button onClick={() => this.handleEmperor(null, 'card')}>Получить
                                                     карту</button> : null}
+                                            {(abbatIncome && abbatIncomeValue) ?
+                                            ([...Array(abbatIncomeValue + 1).keys()].map((i) => (
+                                                    <button onClick={() => this.handleAbbatIncome(i)}>Получить 
+                                                     {i} монет + {abbatIncomeValue - i} карт</button>))) : null}
                                         </div>
                                     </div>
                                     : null}
