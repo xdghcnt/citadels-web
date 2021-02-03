@@ -66,6 +66,7 @@ h1, h2, h3 {
     left: 6px;
     z-index: 1;
     top: 18px;
+    filter: drop-shadow(0px 1px 2px black);
 }
 
 .character-section .cards-list .discard .character {
@@ -698,6 +699,12 @@ button {
 .status > * {
     width: 50px;
     height: 50px;
+    pointer-events: none;
+}
+
+.status.blackmailed > * {
+    width: 35px;
+    height: 35px;
 }
 
 .status.assassined + .character {
@@ -705,13 +712,19 @@ button {
 }
 
 .status.robbed + .character {
+    filter: brightness(0.9) grayscale(0.6);
+}
+
+.status.witched + .character {
     filter: brightness(0.9) grayscale(1);
+}
+
+.status.blackmailed + .character {
+    filter: brightness(0.9) grayscale(0.5);
 }
 
 .cards-list > * {
     position: relative;
-    /* transform: translateY(-50%); */
-    display: f;
 }
 
 .status.robbed {
@@ -1118,4 +1131,15 @@ button {
 button.inactive {
     background: #bfbbb0;
     color: #7b7b7b;
+}
+
+.status.blackmailed {
+    margin-left: 13px;
+    color: #f0930a !important;
+    margin-top: 9px;
+}
+
+.status.witched {
+    right: 8px;
+    color: #aa347c !important;
 }

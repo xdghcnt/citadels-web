@@ -98,7 +98,7 @@ class Card extends React.Component {
             blackmailedChosen = game.state.cardChosen.includes(card) && !isToken,
             currentCharacter = game.state.currentCharacter === card && isToken,
             isSecretVault = card === "secret_vault";
-            
+
         return (
             <div className={cs(type, "card-item", {
                 "card-chosen": cardChosen || blackmailedChosen,
@@ -617,10 +617,12 @@ class Game extends React.Component {
                                 {data.characterInGame.map((card, id) => (
                                     <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
                                         <div className={cs("status", {
-                                            assassined: card === data.assassined || card === data.witched,
-                                            robbed: card === data.robbed || data.blackmailed.includes(card)
+                                            assassined: card === data.assassined,
+                                            witched: card === data.witched,
+                                            robbed: card === data.robbed,
+                                            blackmailed: data.blackmailed.includes(card),
                                         })}>
-                                            {card === data.assassined || card === data.witched ?
+                                            {card === data.assassined ?
                                                 <svg width="485pt" height="403pt" viewBox="0 0 485 403" version="1.1"
                                                      xmlns="http://www.w3.org/2000/svg">
                                                     <g id="#000000ff">
@@ -643,7 +645,7 @@ class Game extends React.Component {
                                                     </g>
                                                 </svg>
                                                 : null}
-                                            {card === data.robbed || data.blackmailed.includes(card) ?
+                                            {card === data.robbed ?
                                                 <svg width="849pt" height="794pt" viewBox="0 0 849 794" version="1.1"
                                                      xmlns="http://www.w3.org/2000/svg">
                                                     <g id="#000000ff">
@@ -656,6 +658,37 @@ class Game extends React.Component {
                                                         <path fill="currentColor" opacity="1.00"
                                                               d=" M 506.10 504.86 C 523.24 504.17 540.20 508.17 556.29 513.75 C 567.60 518.60 578.82 523.91 588.81 531.18 C 593.80 534.52 598.12 538.74 603.02 542.20 C 609.16 546.71 613.31 553.23 618.20 558.94 C 624.19 565.84 628.90 573.71 633.40 581.63 C 637.05 587.49 638.88 594.22 641.63 600.51 C 646.01 613.89 649.77 627.79 649.26 641.99 C 648.97 652.91 650.13 664.01 647.70 674.76 C 646.01 683.47 643.91 692.16 640.46 700.36 C 635.14 716.21 625.73 730.36 615.18 743.20 C 604.07 756.67 589.92 767.31 574.76 775.82 C 556.43 785.94 535.80 791.97 514.89 793.13 C 501.92 793.57 488.82 793.23 476.07 790.66 C 467.71 788.22 459.17 786.30 451.14 782.87 C 432.94 775.60 416.57 764.14 402.72 750.36 C 391.83 739.45 383.17 726.54 375.90 713.01 C 370.91 701.70 366.10 690.13 364.27 677.82 C 359.89 659.29 359.62 639.73 364.18 621.21 C 366.05 606.84 372.20 593.52 378.07 580.42 C 381.74 581.13 385.18 582.61 388.39 584.50 C 396.75 588.68 404.68 593.67 413.02 597.89 C 426.39 604.20 439.27 611.59 453.10 616.92 C 460.78 620.97 469.07 623.63 477.16 626.77 C 484.85 629.72 493.39 629.10 501.26 627.19 C 505.22 626.14 509.37 625.23 512.74 622.77 C 520.84 617.13 528.41 609.79 531.46 600.15 C 536.41 587.01 535.50 572.59 533.04 559.03 C 529.23 542.57 522.11 526.86 511.82 513.43 C 509.69 510.73 507.76 507.87 506.10 504.86 Z"/>
                                                     </g>
+                                                </svg>
+                                                : null}
+                                            {card === data.witched ?
+                                                <svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg"
+                                                     xmlnsXlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+                                                     viewBox="0 0 244.555 244.555"
+                                                     fill="currentColor"
+                                                     xmlSpace="preserve">
+                                                <g>
+                                                	<g>
+                                                		<path d="M207.187,2.821c-2.4-2-6.6-3.9-10.7-2.1c-7.8,5.3,27.4,27,9.6,99.6c-3.7,15-12.8,7.2-23.6,3.9
+                                                			c-24.6-7.7-50.9-9.4-76.4-12.1c-9-1-18.2-1.7-26.9-4.1c-9.2-2.5-9.6-3-7.3-11.4c6.4-8.1,3.8-19.2,3.5-23.8
+                                                			c4.8-10.6,6.6-19.8,2.8-24.5c-10.3-12.2-12,19.4-25.4,19.5c-6.1-0.6-10.1-0.1-11.6-3.4c-2.7-5.7-6.9-13.1-12.3-16.6
+                                                			c-8.3-5.5-10,9.7-6.5,24.1c-1.1,8.8-0.3,14.8,4.2,21.2c2.3,3.2,2.8,7.2,3.5,11c1.3,6.6,2.1,14.8,2.1,21.5c0,3.8,0.7,15.6,1.3,19.4
+                                                			c2.8,17.2,3.7,20.6,16.6,33.2c5.4,5.3,13.6,9.9,17,17c2.5,5.4,4.7,11.3,7,16.7c4.5,10.4,7.3,21,9.2,32.1c1.1,6-13.2,7.3-10.8,15.6
+                                                			c1.9,6.8,20.1,6.7,21.2-1.1c0.7-4.4,2.8-12.4,3.8-18.5c5.3-22.9-2.5-31.8,3.6-52.6c1.6-7.5,30.9,7,34.9,9.7
+                                                			c8.1,5.5,16.8,9.9,25,15.2c12.7,8.2,3.9,15.4-4.3,22.1c-4.4,3.6-4.4,3.8-10,2.5c-4.6-0.9-8.2,1.9-9.2,5.2c-1.5,4.7,5.3,7.9,10,7.3
+                                                			c14.1-1.5,33.6-16.2,39.7-28.9c4.1,4.8,2.4,9.3,0.1,15.4c-1,2.6-2.1,5.1-3,7.7c-2,5.9-3.9,4.3-8.7,5.4c-7.1,2.3-3.9,12.7,3.9,11.5
+                                                			c2.7-0.4,12.9-1.6,14-6.3c0.5-2.1,2.6-6.4,3.6-8.5c2.2-5.2,14.4-32.4,9-37.6c-2.8-2.6-5-5.3-7.1-8.5c-3.3-5.2-1.8-5.8,1.1-10.2
+                                                			c3-4.6,5.7-10,8.3-14.8c5.9-11.4,1.5-21.2,6.7-36.4C231.187,69.521,223.187,16.221,207.187,2.821z"/>
+                                                	</g>
+                                                </g></svg>
+                                                : null}
+                                            {data.blackmailed.includes(card) ?
+                                                <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg"
+                                                     x="0px" y="0px"
+                                                     width="512px" height="512px" viewBox="0 0 512 512"
+                                                     fill="currentColor"
+                                                     enable-background="new 0 0 512 512">
+                                                    <path d="M318.031,254.969L490.531,448H21.453l172.5-193.031L256,309.25L318.031,254.969z M487.688,64H24.297L256,266.75L487.688,64z
+                                                 M342.125,233.906L512,424V85.25L342.125,233.906z M0,85.25V424l169.859-190.125L0,85.25z"/>
                                                 </svg>
                                                 : null}
                                         </div>
@@ -701,7 +734,8 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && ['assassin-action', 'witch-action'].includes(data.player.action) && !data.userAction ?
                                     <div className="choose-character">
-                                        <p className="status-text">Выберите персонажа для {data.player.action === "witch-action" ? "колдовства" : "убийства"}</p>
+                                        <p className="status-text">Выберите персонажа
+                                            для {data.player.action === "witch-action" ? "колдовства" : "убийства"}</p>
                                         <div className="cards-list">
                                             {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.characterInGame.indexOf(id) < 1)).map((card, id) => (
                                                 <Card key={id} card={card} type="character" game={this}
@@ -712,8 +746,9 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && ['thief-action', 'blackmailer-action'].includes(data.player.action) && !data.userAction ?
                                     <div className="status-text" className="choose-character">
-                                        <p className="status-text" className="status-text">Выберите персонажа для {data.player.action === "thief-action" ? "воровства" : 
-                                            data.cardChosen.length == 0 ? "шантажа" : "блефа"}</p>
+                                        <p className="status-text" className="status-text">Выберите персонажа
+                                            для {data.player.action === "thief-action" ? "воровства" :
+                                                data.cardChosen.length == 0 ? "шантажа" : "блефа"}</p>
                                         <div className="cards-list">
                                             {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || [data.assassined, data.witched].includes(id) || data.characterInGame.indexOf(id) < 2))
                                                 .map((card, id) => (
@@ -749,23 +784,25 @@ class Game extends React.Component {
                                             <button onClick={() => this.setUserAction("magician")}>Сбросить
                                                 карты</button> : null}
                                         {blackmailedResponseAction ?
-                                            <button onClick={() => this.handleBlackmailedResponse('yes')}>Откупиться от шантажа</button> : null}
+                                            <button onClick={() => this.handleBlackmailedResponse('yes')}>Откупиться от
+                                                шантажа</button> : null}
                                         {blackmailedResponseAction ?
                                             <span className="button-or">
                                                 или
                                             </span> : null}
                                         {blackmailedResponseAction ?
-                                            <button onClick={() => this.handleBlackmailedResponse('no')}>Отказаться от откупа</button> : null}
+                                            <button onClick={() => this.handleBlackmailedResponse('no')}>Отказаться от
+                                                откупа</button> : null}
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
-                                            монеты</button> : null}
+                                                монеты</button> : null}
                                         {navigatorAction ?
                                             <span className="button-or">
                                                 или
                                             </span> : null}
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('card')}>Получить
-                                                4 карты</button> : null}        
+                                                4 карты</button> : null}
                                         {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0) ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}
@@ -782,7 +819,7 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleForgery()}>Исп. Кузницу</button> : null}
                                         {data.incomeAction ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
-                                                доход</button> : null}                                    
+                                                доход</button> : null}
                                         {data.tookResource && !blackmailedResponseAction ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
@@ -845,11 +882,11 @@ class Game extends React.Component {
                                                         const card = `${type + 1}_${set + 1}`;
                                                         return <div
                                                             title={!data.createGamePanel.charactersAvailable.includes(card) && card !== "9_1"
-                                                            ? "В разработке" : ""}
+                                                                ? "В разработке" : ""}
                                                             className={cs("character-slot", {
-                                                            available: data.createGamePanel.charactersAvailable.includes(card),
-                                                            selected: data.createGamePanel.charactersSelected.includes(card)
-                                                        })}>
+                                                                available: data.createGamePanel.charactersAvailable.includes(card),
+                                                                selected: data.createGamePanel.charactersSelected.includes(card)
+                                                            })}>
                                                             <Card card={card} type="character"
                                                                   game={this}
                                                                   onClick={() => this.handleClickCharacter(set + 1, type + 1)}/>
