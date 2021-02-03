@@ -126,6 +126,7 @@ function init(wsServer, path) {
                         room.king = getRandomPlayer();
                         room.ender = null;
                         room.winnerPlayer = null;
+                        room.tax = 0;
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
                         newRound();
                     }
@@ -145,6 +146,7 @@ function init(wsServer, path) {
                     Object.keys(players).forEach(slot => {
                         players[slot].character = [];
                         room.playerCharacter[slot] = [];
+                        delete players[slot].trueBlackmailed;
                     });
                     state.characterRoles = {};
 
@@ -152,10 +154,10 @@ function init(wsServer, path) {
                     room.robbed = null;
                     room.witched = null;
                     room.blackmailed = [];
+                    room.trueBlackmailed = null;
                     state.trueBlackmailed = null;
                     room.witchedstate = 0;
                     state.emperorAction = false;
-                    room.tax = 0;
                     room.currentPlayer = room.king;
                     players[room.currentPlayer].action = 'choose';
                     players[room.currentPlayer].choose = state.characterDeck;
@@ -724,6 +726,7 @@ function init(wsServer, path) {
                         room.characterInGame.indexOf(charFalse) > 1 && ![room.assassined, room.witched].includes(charFalse)) {
                         room.blackmailed = [charTrue, charFalse].sort((a, b) => room.characterInGame.indexOf(a) - room.characterInGame.indexOf(b));
                         state.trueBlackmailed = charTrue;
+                        players[slot].trueBlackmailed = charTrue;
                         players[slot].action = null;
                         update();
                         sendStateSlot(slot);
@@ -764,9 +767,12 @@ function init(wsServer, path) {
                                 room.playerGold[blackmailedSlot] -= gold;
                                 room.playerGold[room.currentPlayer] += gold;
                                 room.blackmailed = [];
+                                room.trueBlackmailed = state.trueBlackmailed;
                                 countPoints(blackmailedSlot);
                                 countPoints(room.currentPlayer);
                             }
+                        } else {
+                            room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
                         }
                         sendStateSlot(blackmailedSlot);
                         sendStateSlot(room.currentPlayer);
@@ -944,7 +950,7 @@ function init(wsServer, path) {
                             return sendSlot(slot, "message", 'Вы не можете забрать эту постройку себе');
                         const cost = Math.max(0, getDistrictCost(opp_building) + include(opp, "great_wall") * (opp_building.type !== "great_wall") - getDistrictCost(my_building));
                         if (room.playerGold[slot] < cost)
-                            return sendSlot(slot, "message", `Недостаточно монет ${room.playerGold[slot]}/${cost}).`);
+                            return sendSlot(slot, "message", `Недостаточно монет (${room.playerGold[slot]}/${cost}).`);
                         players[slot].action = null;
                         room.playerGold[slot] -= cost;
                         room.playerDistricts[slot].splice(my_d, 1, opp_building);
