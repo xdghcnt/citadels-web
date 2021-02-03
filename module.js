@@ -1131,7 +1131,7 @@ function init(wsServer, path) {
                         room.teamsLocked = !room.teamsLocked;
                     update();
                 },
-                "state.players-join": (user, slot) => {
+                "players-join": (user, slot) => {
                     if (!room.teamsLocked && room.playerSlots[slot] === null) {
                         if (~room.playerSlots.indexOf(user))
                             room.playerSlots[room.playerSlots.indexOf(user)] = null;
