@@ -11,12 +11,6 @@ function makeId() {
     return text;
 }
 
-class ImgSvg extends React.Component {
-    render() {
-        return <img src={this.props.src} onLoad={(e) => SVGInject(e.target)}/>;
-    }
-}
-
 class Player extends React.Component {
     render() {
         const
@@ -89,23 +83,25 @@ class Card extends React.Component {
     render() {
         const
             game = this.props.game,
-            card = this.props.card,
-            cardType = card.type,
             type = this.props.type,
-            isToken = this.props.isToken,
             isCharacter = type === "character",
-            getBackgroundImage = (isToken) => `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
+            data = this.props.game.state,
+            originalCard = this.props.card,
+            isToken = this.props.isToken,
+            card = (originalCard === "1_2" && data.witchedstate === 1 && !isToken) ? data.witched : originalCard,
+            cardType = card.type,
+            getBackgroundImage = (isToken, useOriginalCard) => `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
                 isCharacter
-                    ? (card !== "0_1" ? card : "card_back")
+                    ? (card !== "0_1" ? (useOriginalCard ? originalCard : card) : "card_back")
                     : cardType || "card_back"
             }.jpg)`,
             backgroundImage = getBackgroundImage(isToken),
             backgroundImageZoomed = getBackgroundImage(),
-            cardChosen = this.props.play === undefined && game.state.userAction != null && game.state.cardChosen.includes(this.props.id),
-            blackmailedChosen = game.state.cardChosen.includes(card) && !isToken,
-            diplomatCard = game.state.player && game.state.player.action === 'diplomat-action' && this.props.play && !isCharacter
-                && game.state.cardChosen[0] === this.props.slot && game.state.cardChosen[1] === this.props.id,
-            currentCharacter = game.state.currentCharacter === card && isToken,
+            cardChosen = this.props.play === undefined && data.userAction != null && data.cardChosen.includes(this.props.id),
+            blackmailedChosen = data.cardChosen.includes(card) && !isToken,
+            diplomatCard = data.player && data.player.action === 'diplomat-action' && this.props.play && !isCharacter
+                && data.cardChosen[0] === this.props.slot && data.cardChosen[1] === this.props.id,
+            currentCharacter = data.currentCharacter === card && isToken,
             isSecretVault = card.type === "secret_vault";
         return (
             <div className={cs(type, "card-item", {
@@ -114,7 +110,8 @@ class Card extends React.Component {
                 "current-character": currentCharacter,
                 "secret-vault": isSecretVault,
                 "decoration": card.decoration,
-                "in-action": !isCharacter && game.state.userAction === card.type
+                "in-action": !isCharacter && data.userAction === card.type,
+                "witched-state": !isToken && data.witchedstate === 1 && originalCard === data.witched
             })}
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
@@ -126,12 +123,15 @@ class Card extends React.Component {
                 {card !== "0_1" ? (<div className={`card-item-zoomed`}
                                         style={{"background-image": backgroundImageZoomed}}/>) : ""}
                 {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
-                {card === "9_3" && isToken && game.state.tax ? <div className="exposition-count">
-                    <div className="decoration-coin"></div>{game.state.tax}
+                {card === "9_3" && isToken ? <div className={cs("tax-counter", {empty: !data.tax})}>
+                    <div className="tax-counter-coin"/>
+                    <div className="tax-counter-value">{data.tax || 0}</div>
                 </div> : ""}
                 {card.exposition ? <div className="exposition-count">
                     <i className="material-icons">content_copy</i> {card.exposition.length}
                 </div> : ""}
+                {originalCard !== card ? <div className="card-item-original"
+                                              style={{"background-image": getBackgroundImage(true, true)}}/> : ""}
             </div>
         );
     }
@@ -147,7 +147,7 @@ class PlayerSlot extends React.Component {
             districts = data.playerDistricts[slot],
             character = player === data.userId && data.player ? data.player.character : data.playerCharacter[slot],
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
-            theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5  && data.playerChosen === null,
+            theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5 && data.playerChosen === null,
             wizardAction = data.player && data.player.action === 'wizard-player-action' && data.phase === 2,
             emperorAction = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2 && data.playerChosen === null,
             abbatAction = data.player && data.player.action === 'abbat-action' && data.phase === 2,
@@ -229,6 +229,153 @@ class PlayerSlot extends React.Component {
     }
 }
 
+class CreateGamePanel extends React.Component {
+    constructor() {
+        super();
+        this.state = {};
+    }
+
+    handleClickCharacter(set, type) {
+        const
+            card = `${type}_${set}`,
+            currentCharacters = this.state.charactersSelected,
+            alreadyHas = currentCharacters.has(card);
+        if (!this.state.charactersAvailable.has(card))
+            return;
+        if (type === 9 && (![3, 8].includes(this.playerCount) || !alreadyHas)) {
+            if (!alreadyHas) {
+                currentCharacters.delete("9_1");
+                currentCharacters.delete("9_2");
+                currentCharacters.delete("9_3");
+                currentCharacters.add(card);
+            } else {
+                currentCharacters.delete(card);
+            }
+        } else if (type !== 9) {
+            const currentCharactersArray = [...currentCharacters];
+            currentCharactersArray[type - 1] = card;
+            this.state.charactersSelected = new Set(currentCharactersArray);
+        }
+        this.setState(this.state);
+    }
+
+    handleClickDistrict(district) {
+        if (this.playerCount < 4 && district === "theater")
+            return;
+        if (district === "theater")
+            this.state.theaterTouched = true;
+        if (!this.state.districtsSelected.has(district))
+            this.state.districtsSelected.add(district);
+        else
+            this.state.districtsSelected.delete(district);
+        this.setState(this.state);
+    }
+
+    render() {
+        const
+            data = this.props.data,
+            game = this.props.game,
+            playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
+            getNineCharacterAvailable = (set) => set !== 2
+                ? (playerCount === 2
+                    ? []
+                    : [`9_${set}`])
+                : (playerCount < 5
+                    ? []
+                    : [`9_2`]),
+            getEmperorAvailable = () => (playerCount === 2
+                ? []
+                : [`4_2`]);
+
+        this.playerCount = playerCount;
+
+        this.state.charactersAvailable = new Set([
+            "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
+            "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getNineCharacterAvailable(2),
+            "4_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3) //"1_3", "2_3", "3_3", "5_3"
+        ]);
+
+        if (!this.state.charactersSelected)
+            this.state.charactersSelected = new Set([
+                "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1"
+            ]);
+        else
+            this.state.charactersSelected.forEach((character) => {
+                if (!this.state.charactersAvailable.has(character)) {
+                    this.state.charactersSelected.delete(character);
+                    if (character === "4_2")
+                        this.state.charactersSelected.add("4_1");
+                }
+            });
+
+        if ((playerCount === 3 || playerCount === 8) && !(this.state.charactersSelected.has("9_1")
+            || this.state.charactersSelected.has("9_2") || this.state.charactersSelected.has("9_3")))
+            this.state.charactersSelected.add("9_1");
+
+        if (!this.state.districtsSelected)
+            this.state.districtsSelected = new Set(data.uniqueDistricts);
+
+        if (playerCount < 4)
+            this.state.districtsSelected.delete("theater");
+        else if (!this.state.districtsSelected.has("theater") && !this.state.theaterTouched)
+            this.state.districtsSelected.add("theater");
+
+        return <div className="create-game-panel">
+            <div className="create-game-panel-modal">
+                <div className="create-game-title">
+                    Выбор набора карт
+                </div>
+                <div className="characters-panel">
+                    <div className="create-game-subtitle">Персонажи</div>
+                    <div className={cs("characters-set")}>
+                        {Array(3).fill(null).map((_, set) =>
+                            <div className={cs("characters-row")}>
+                                {Array(9).fill(null).map((_, type) => {
+                                        const card = `${type + 1}_${set + 1}`;
+                                        return <div
+                                            title={!this.state.charactersAvailable.has(card) && !["9_1", "4_2", "9_2"].includes(card)
+                                                ? "В разработке" : ""}
+                                            className={cs("character-slot", {
+                                                available: this.state.charactersAvailable.has(card),
+                                                selected: this.state.charactersSelected.has(card)
+                                            })}>
+                                            <Card card={card} type="character"
+                                                  game={game}
+                                                  onClick={() => this.handleClickCharacter(set + 1, type + 1)}/>
+                                        </div>;
+                                    }
+                                )}
+                            </div>)}
+
+                    </div>
+                    <div className="create-game-subtitle">Уникальные кварталы</div>
+                    <div className={cs("district-set")}>
+                        {data.uniqueDistricts.map((district) => (
+                            <div className={cs("district-slot", {
+                                selected: this.state.districtsSelected.has(district)
+                            })}>
+                                <Card card={{type: district}} type="card"
+                                      game={game}
+                                      onClick={() => this.handleClickDistrict(district)}/>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="create-game-buttons">
+                    <button onClick={() => game.handleClickCloseCreateGame()}>Отмена</button>
+                    <button className={cs({
+                        inactive: playerCount < 2
+                    })}
+                            onClick={() => playerCount >= 2
+                                && game.handleClickCreateGame(
+                                    [...this.state.charactersSelected],
+                                    [...this.state.districtsSelected])}>Создать
+                    </button>
+                </div>
+            </div>
+        </div>;
+    }
+}
 
 class Game extends React.Component {
 
@@ -325,7 +472,7 @@ class Game extends React.Component {
         this.state.player.action === 'wizard-card-action' ?
             this.socket.emit("wizard-choose-card", card) :
             this.state.player.action === 'scholar-response' ?
-                this.socket.emit("scholar-response", card) :  
+                this.socket.emit("scholar-response", card) :
                 this.socket.emit("take-card", card);
     }
 
@@ -479,19 +626,19 @@ class Game extends React.Component {
 
     handleClickBuilding(slot, card) {
         if (this.state.player.action === 'diplomat-action') {
-            if (!this.state.cardChosen.length) 
-                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] }));
+            if (!this.state.cardChosen.length)
+                return this.setState(Object.assign(this.state, {cardChosen: [slot, card]}));
             if (slot === this.state.userSlot && slot === this.state.cardChosen[0])
-                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] })); 
-            if (slot !== this.state.userSlot && this.state.userSlot !== this.state.cardChosen[0]) 
-                return this.setState(Object.assign(this.state, { cardChosen: [slot, card] }));
-            
-            if (this.state.cardChosen[0] === this.state.userSlot) 
+                return this.setState(Object.assign(this.state, {cardChosen: [slot, card]}));
+            if (slot !== this.state.userSlot && this.state.userSlot !== this.state.cardChosen[0])
+                return this.setState(Object.assign(this.state, {cardChosen: [slot, card]}));
+
+            if (this.state.cardChosen[0] === this.state.userSlot)
                 this.socket.emit('exchange-districts', this.state.cardChosen[1], slot, card);
-            else 
+            else
                 this.socket.emit('exchange-districts', card, this.state.cardChosen[0], this.state.cardChosen[1]);
-            this.handleStopUserAction(); 
-            return; 
+            this.handleStopUserAction();
+            return;
         }
         if (this.state.userAction === 'arsenal') {
             this.socket.emit("arsenal-destroy", slot, card);
@@ -514,80 +661,23 @@ class Game extends React.Component {
 
     handleClickTogglePause() {
         if (this.state.phase === 0) {
-            const
-                playerCount = this.state.playerSlots && this.state.playerSlots.filter((slot) => slot !== null).length,
-                getNineCharacterAvailable = (set) => (playerCount === 2
-                    ? []
-                    : [`9_${set}`]),
-                getEmperorAvailable = (set) => (playerCount === 2
-                    ? []
-                    : [`4_2`]),
-                getQueenAvailable = (set) => (playerCount < 5
-                    ? []
-                    : [`9_2`]),
-                getNineCharacterSelected = (set) => ([3, 8].includes(playerCount)
-                    ? [`9_${set}`]
-                    : []);
-
             this.setState({
                 ...this.state,
-                createGamePanel: {
-                    charactersAvailable: [
-                        "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
-                        "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getQueenAvailable(),
-                        "4_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3) //"1_3", "2_3", "3_3", "5_3"
-                    ],
-                    charactersSelected: [
-                        "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterSelected(1)
-                    ],
-                    districtsSelected: [
-                        ...this.state.uniqueDistricts.filter((district) => playerCount > 3 || district !== "theater")
-                    ]
-                }
+                showCreateGamePanel: true
             });
         }
     }
 
-    handleClickCreateGame() {
-        this.socket.emit("start-game", this.state.createGamePanel.charactersSelected, this.state.createGamePanel.districtsSelected);
+    handleClickCreateGame(charactersSelected, districtsSelected) {
+        this.socket.emit("start-game", charactersSelected, districtsSelected);
         this.handleClickCloseCreateGame();
     }
 
     handleClickCloseCreateGame() {
         this.setState({
             ...this.state,
-            createGamePanel: null
+            showCreateGamePanel: false
         });
-    }
-
-    handleClickCharacter(set, type) {
-        const
-            playerCount = this.state.playerSlots && this.state.playerSlots.filter((slot) => slot !== null).length,
-            card = `${type}_${set}`,
-            currentCharacters = this.state.createGamePanel.charactersSelected,
-            alreadyHas = currentCharacters.includes(card);
-        if (!this.state.createGamePanel.charactersAvailable.includes(card))
-            return;
-        if (type === 9 && playerCount >= 4 && playerCount <= 7 && (alreadyHas || currentCharacters.length === 8)) {
-            if (alreadyHas)
-                currentCharacters.splice(8, 1);
-            else
-                currentCharacters.push(card);
-        } else if (type !== 9)
-            currentCharacters[type - 1] = card;
-        this.setState(this.state);
-    }
-
-    handleClickDistrict(district) {
-        const playerCount = this.state.playerSlots && this.state.playerSlots.filter((slot) => slot !== null).length;
-        if (playerCount < 4 && district === "theater")
-            return;
-        const districtIndex = this.state.createGamePanel.districtsSelected.indexOf(district);
-        if (districtIndex === -1)
-            this.state.createGamePanel.districtsSelected.push(district);
-        else
-            this.state.createGamePanel.districtsSelected.splice(districtIndex, 1);
-        this.setState(this.state);
     }
 
     handleClickStop() {
@@ -669,11 +759,10 @@ class Game extends React.Component {
             data = this.state,
             isHost = data.hostId === data.userId,
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
-            notEnoughPlayers = data.phase === 0 && playerCount < 2,
             blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
             blackmailedOpenAction = data.player && data.player.action === 'blackmailed-open' && data.phase === 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
-            emperor = data.player && ['emperor-action','emperor-nores-action'].includes(data.player.action) && data.phase === 2,
+            emperor = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2,
             emperorAction = data.player && data.userAction === 'emperor' && data.phase === 2,
             abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
             navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
@@ -702,13 +791,13 @@ class Game extends React.Component {
                     necropolis: "Вы можете выбрать квартал для разрушения",
                     den_of_thieves: "Вы можете выбрать карты для оплаты",
                     emperor: "Выберите ресурс, за который вы отдадите корону",
-                    abbat: "Выберите количество дохода, получаемый картами"
+                    abbat: "Количество дохода, получаемое картами"
                 }[data.userAction];
             let incomeValue = 0;
             if (data.incomeAction) {
                 const kindIncome = data.currentCharacter.split('_')[0];
                 incomeValue = data.playerDistricts[data.userSlot] ? data.playerDistricts[data.userSlot].filter(card => card.kind === Number(kindIncome)).length
-                + data.playerDistricts[data.userSlot].some(card => card.type === "school_of_magic") : 0;
+                    + data.playerDistricts[data.userSlot].some(card => card.type === "school_of_magic") : 0;
             }
             return (
                 <div
@@ -721,13 +810,15 @@ class Game extends React.Component {
                     {data.phase !== 0 ?
                         <div className="character-section">
                             <div className="cards-list">
-                                {data.characterInGame.map((card, id) => (
-                                    <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
+                                {data.characterInGame.map((card, id) => {
+                                    const trueBlackmailed = data.trueBlackmailed === card || (data.player && data.player.trueBlackmailed === card && data.blackmailed.includes(card));
+                                    return <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
                                         <div className={cs("status", {
                                             assassined: card === data.assassined,
                                             witched: card === data.witched,
                                             robbed: card === data.robbed,
                                             blackmailed: data.blackmailed.includes(card),
+                                            "true-blackmailed": trueBlackmailed
                                         })}>
                                             {card === data.assassined ?
                                                 <ReactInlineSVG.default src="/citadels/icons/assassinated.svg"/>
@@ -738,14 +829,17 @@ class Game extends React.Component {
                                             {card === data.witched ?
                                                 <ReactInlineSVG.default src="/citadels/icons/witched.svg"/>
                                                 : null}
-                                            {data.blackmailed.includes(card) ?
+                                            {!trueBlackmailed && data.blackmailed.includes(card) ?
                                                 <ReactInlineSVG.default src="/citadels/icons/blackmailed.svg"/>
+                                                : null}
+                                            {trueBlackmailed ?
+                                                <ReactInlineSVG.default src="/citadels/icons/blackmailed-true.svg"/>
                                                 : null}
                                         </div>
                                         <Card key={id} card={card} type="character" game={this}
                                               isToken={true}/>
-                                    </div>
-                                ))}
+                                    </div>;
+                                })}
                             </div>
                         </div>
                         : null}
@@ -864,7 +958,8 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleNavigatorResource('card')}>Получить
                                                 4 карты</button> : null}
                                         {this.state.player.action === 'scholar-action' ?
-                                            <button onClick={() => this.handleScholar()}>Раскопать карту</button> : null}
+                                            <button onClick={() => this.handleScholar()}>Раскопать
+                                                карту</button> : null}
                                         {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0) ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}
@@ -915,7 +1010,7 @@ class Game extends React.Component {
                                                 </button> : null}
                                             {(emperorAction) ?
                                                 <button onClick={() => this.handleEmperor(null, 'coin')}>Получить
-                                                монету</button> : null}
+                                                    монету</button> : null}
                                             {(emperorAction) ?
                                                 <span className="button-or">
                                                     или
@@ -924,8 +1019,9 @@ class Game extends React.Component {
                                                 <button onClick={() => this.handleEmperor(null, 'card')}>Получить
                                                     карту</button> : null}
                                             {(abbatIncome && incomeValue) ?
-                                            ([...Array(incomeValue + 1).keys()].map((i) => (
-                                                    <button onClick={() => this.handleAbbatIncome(i)}>{i} к.</button>))) : null}
+                                                ([...Array(incomeValue + 1).keys()].map((i) => (
+                                                    <button
+                                                        onClick={() => this.handleAbbatIncome(i)}>{i} к.</button>))) : null}
                                         </div>
                                     </div>
                                     : null}
@@ -942,57 +1038,8 @@ class Game extends React.Component {
                     }>
                         <Spectators game={this} data={data} handleSpectatorsClick={() => this.handleSpectatorsClick()}/>
                     </div>
-                    {data.createGamePanel ?
-                        <div className="create-game-panel">
-                            <div className="create-game-panel-modal">
-                                <div className="create-game-title">
-                                    Выбор набора карт
-                                </div>
-                                <div className="characters-panel">
-                                    <div className="create-game-subtitle">Персонажи</div>
-                                    <div className={cs("characters-set")}>
-                                        {Array(3).fill(null).map((_, set) =>
-                                            <div className={cs("characters-row")}>
-                                                {Array(9).fill(null).map((_, type) => {
-                                                        const card = `${type + 1}_${set + 1}`;
-                                                        return <div
-                                                            title={!data.createGamePanel.charactersAvailable.includes(card) && !["9_1", "4_2", "9_2"].includes(card)
-                                                                ? "В разработке" : ""}
-                                                            className={cs("character-slot", {
-                                                                available: data.createGamePanel.charactersAvailable.includes(card),
-                                                                selected: data.createGamePanel.charactersSelected.includes(card)
-                                                            })}>
-                                                            <Card card={card} type="character"
-                                                                  game={this}
-                                                                  onClick={() => this.handleClickCharacter(set + 1, type + 1)}/>
-                                                        </div>;
-                                                    }
-                                                )}
-                                            </div>)}
-
-                                    </div>
-                                    <div className="create-game-subtitle">Уникальные кварталы</div>
-                                    <div className={cs("district-set")}>
-                                        {data.uniqueDistricts.map((district) => (
-                                            <div className={cs("district-slot", {
-                                                selected: data.createGamePanel.districtsSelected.includes(district)
-                                            })}>
-                                                <Card card={{type: district}} type="card"
-                                                      game={this}
-                                                      onClick={() => this.handleClickDistrict(district)}/>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="create-game-buttons">
-                                    <button onClick={() => this.handleClickCloseCreateGame()}>Отмена</button>
-                                    <button className={cs({
-                                        inactive: playerCount < 2
-                                    })} onClick={() => playerCount >= 2 && this.handleClickCreateGame()}>Создать
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                    {data.showCreateGamePanel ?
+                        <CreateGamePanel data={data} game={this}/>
                         : ""}
                     <div className="host-controls panel">
                         <div className="side-buttons">
