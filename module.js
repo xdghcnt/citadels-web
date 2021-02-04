@@ -827,6 +827,7 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                         sendStateSlot(state.wizardPlayer);
                         state.wizardPlayer = null;
+                        state.players[slot].action = null;
                         update();
                     }
                 },
