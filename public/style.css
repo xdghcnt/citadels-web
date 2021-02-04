@@ -442,7 +442,7 @@ body {
     /* border: 1px solid red; */
 }
 
-.player-slot.player-chosen .card-item {
+.player-slot.player-chosen .character-container .card-item {
     box-shadow: 0 0 8px 1px red;
 }
 

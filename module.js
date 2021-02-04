@@ -243,6 +243,7 @@ function init(wsServer, path) {
                     room.forgeryAction = false;
                     room.laboratoryAction = false;
                     room.museumAction = false;
+                    room.incomeAction = false;
                     state.startTurn = false;
                     if (["4_1", "4_3"].includes(room.currentCharacter)) room.king = room.currentPlayer;
                     if (waitToResponse()) {
@@ -982,7 +983,7 @@ function init(wsServer, path) {
                         if (room.playerGold[slot] < cost)
                             return sendSlot(slot, "message", `Недостаточно монет (${room.playerGold[slot]}/${cost}).`);
                         room.playerDistricts[slot_d].splice(cardInd, 1);
-                        room.playerDistricts[slot].splice(-1, 0, building);
+                        room.playerDistricts[slot].push(building);
                         state.players[slot].action = null;
                         room.playerGold[slot] -= cost;
                         room.playerGold[slot_d] += cost;
