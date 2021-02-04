@@ -271,10 +271,218 @@ class CreateGamePanel extends React.Component {
         this.setState(this.state);
     }
 
+    getPreset(game) {
+        return {
+            default: {
+                name: "Оригинал",
+                desc: "Изначальный набор персонажей игры «Цитадели», вышешей в 2000-м году",
+                characters: [
+                    "1_1",
+                    "2_1",
+                    "3_1",
+                    "4_1",
+                    "5_1",
+                    "6_1",
+                    "7_1",
+                    "8_1",
+                    "9_1"
+                ],
+                quarters: game.getUniqueDistricts()
+            },
+            aristocrats: {
+                name: "Амбициозные аристократы",
+                desc: "Вы сможете сосредоточиться на строительстве кварталов (или попытках получить их другими путями). У вас будет много возможностей построить несколько кварталов за ход.",
+                characters: [
+                    "1_3",
+                    "2_1",
+                    "3_2",
+                    "4_3",
+                    "5_1",
+                    "6_3",
+                    "7_1",
+                    "8_3",
+                    "9_2"
+                ],
+                districts: [
+                    "capitol",
+                    "factory",
+                    "framework",
+                    "great_wall",
+                    "haunted_quarter",
+                    "keep",
+                    "necropolis",
+                    "park",
+                    "poor_house",
+                    "quarry",
+                    "school_of_magic",
+                    "stable",
+                    "memorial",
+                    "den_of_thieves"
+                ]
+            },
+            agents: {
+                name: "Хитроумные агенты",
+                desc: "В основе этой комбинации лежит прямое противостояние игроков. В партии с таким составом вас ждёт немало любопытных ситуаций.",
+                characters: [
+                    "1_2",
+                    "2_2",
+                    "3_1",
+                    "4_2",
+                    "5_2",
+                    "6_2",
+                    "7_1",
+                    "8_1",
+                    "9_3"
+                ],
+                quarters: [
+                    "arsenal",
+                    "basilica",
+                    "dragon_gate",
+                    "gold_mine",
+                    "keep",
+                    "monument",
+                    "museum",
+                    "necropolis",
+                    "park",
+                    "poor_house",
+                    "quarry",
+                    "secret_vault",
+                    "forgery",
+                    "theatre"
+                ]
+            },
+            emissary: {
+                name: "Видные эмиссары",
+                desc: "Эта комбинация менее агрессивна, чем предыдущая. У вас будет немало способов защитить свои владения и несколько альтернативных путей получить ресурсы.",
+                characters: [
+                    "1_2",
+                    "2_3",
+                    "3_3",
+                    "4_2",
+                    "5_1",
+                    "6_1",
+                    "7_3",
+                    "8_2",
+                    "9_1"
+                ],
+                quarters: [
+                    "factory",
+                    "framework",
+                    "great_wall",
+                    "haunted_quarter",
+                    "ivory_tower",
+                    "keep",
+                    "library",
+                    "museum",
+                    "observatory",
+                    "park",
+                    "poor_house",
+                    "quarry",
+                    "school_of_magic",
+                    "forgery"
+                ]
+            },
+            dignitaries: {
+                name: "Коварные сановники",
+                desc: "Блеф, интриги, попытки раскусить соперников и предугадать их тактику — вот ключевые особенности этой комбинации.",
+                characters: [
+                    "1_3",
+                    "2_2",
+                    "3_2",
+                    "4_1",
+                    "5_2",
+                    "6_2",
+                    "7_2",
+                    "8_3",
+                    "9_2"
+                ],
+                quarters: [
+                    "dragon_gate",
+                    "factory",
+                    "framework",
+                    "haunted_quarter",
+                    "laboratory",
+                    "necropolis",
+                    "park",
+                    "poor_house",
+                    "secret_vault",
+                    "forgery",
+                    "stable",
+                    "theatre",
+                    "den_of_thieves",
+                    "well_of_wishes"
+                ]
+            },
+            messengers: {
+                name: "Неуступчивые посланники",
+                desc: "Вы сможете проверить, как взаимодействуют друг с другом различные карты персонажей и кварталов на пределе своих возможностей.",
+                characters: [
+                    "1_1",
+                    "2_3",
+                    "3_3",
+                    "4_1",
+                    "5_3",
+                    "6_3",
+                    "7_3",
+                    "8_2",
+                    "9_1"
+                ],
+                quarters: [
+                    "basilica",
+                    "capitol",
+                    "haunted_quarter",
+                    "imperial_treasury",
+                    "laboratory",
+                    "library",
+                    "map_room",
+                    "observatory",
+                    "school_of_magic",
+                    "secret_vault",
+                    "forgery",
+                    "stable",
+                    "memorial",
+                    "well_of_wishes"
+                ]
+            },
+            nobles: {
+                name: "Порочные дворяне",
+                desc: "Вас ждёт беспощадное противостояние, полное интриг и жёсткой агрессии. В общем, не для слабонервных…",
+                characters: [
+                    "1_1",
+                    "2_1",
+                    "3_1",
+                    "4_3",
+                    "5_3",
+                    "6_1",
+                    "7_2",
+                    "8_1",
+                    "9_3"
+                ],
+                quarters: [
+                    "arsenal",
+                    "basilica",
+                    "dragon_gate",
+                    "gold_mine",
+                    "imperial_treasury",
+                    "ivory_tower",
+                    "laboratory",
+                    "room_of_maps",
+                    "monument",
+                    "museum",
+                    "school_of_magic",
+                    "memorial",
+                    "den_of_thieves",
+                    "well_of_wishes"
+                ]
+            }
+        };
+    }
+
     render() {
         const
             data = this.props.data,
             game = this.props.game,
+            galleryMode = this.props.galleryMode,
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             getNineCharacterAvailable = (set) => set !== 2
                 ? (playerCount === 2
@@ -286,6 +494,9 @@ class CreateGamePanel extends React.Component {
             getEmperorAvailable = () => (playerCount === 2
                 ? []
                 : [`4_2`]);
+
+        if (this.presets)
+            this.presets = this.getPreset(game);
 
         this.playerCount = playerCount;
 
@@ -313,17 +524,17 @@ class CreateGamePanel extends React.Component {
             this.state.charactersSelected.add("9_1");
 
         if (!this.state.districtsSelected)
-            this.state.districtsSelected = new Set(data.uniqueDistricts);
+            this.state.districtsSelected = new Set(game.getUniqueDistricts());
 
         if (playerCount < 4)
             this.state.districtsSelected.delete("theater");
         else if (!this.state.districtsSelected.has("theater") && !this.state.theaterTouched)
             this.state.districtsSelected.add("theater");
 
-        return <div className="create-game-panel">
+        return <div className={cs("create-game-panel", {galleryMode, noPresetSelected: !this.state.presetSelected})}>
             <div className="create-game-panel-modal">
                 <div className="create-game-title">
-                    Выбор набора карт
+                    {!galleryMode ? "Выбор набора карт" : "Галерея карт"}
                 </div>
                 <div className="characters-panel">
                     <div className="create-game-subtitle">Персонажи</div>
@@ -333,15 +544,13 @@ class CreateGamePanel extends React.Component {
                                 {Array(9).fill(null).map((_, type) => {
                                         const card = `${type + 1}_${set + 1}`;
                                         return <div
-                                            title={!this.state.charactersAvailable.has(card) && !["9_1", "4_2", "9_2"].includes(card)
-                                                ? "В разработке" : ""}
                                             className={cs("character-slot", {
-                                                available: this.state.charactersAvailable.has(card),
-                                                selected: this.state.charactersSelected.has(card)
+                                                available: galleryMode || this.state.charactersAvailable.has(card),
+                                                selected: galleryMode || this.state.charactersSelected.has(card)
                                             })}>
                                             <Card card={card} type="character"
                                                   game={game}
-                                                  onClick={() => this.handleClickCharacter(set + 1, type + 1)}/>
+                                                  onClick={() => !galleryMode && this.handleClickCharacter(set + 1, type + 1)}/>
                                         </div>;
                                     }
                                 )}
@@ -350,27 +559,27 @@ class CreateGamePanel extends React.Component {
                     </div>
                     <div className="create-game-subtitle">Уникальные кварталы</div>
                     <div className={cs("district-set")}>
-                        {data.uniqueDistricts.map((district) => (
+                        {game.getUniqueDistricts().map((district) => (
                             <div className={cs("district-slot", {
                                 selected: this.state.districtsSelected.has(district)
                             })}>
                                 <Card card={{type: district}} type="card"
                                       game={game}
-                                      onClick={() => this.handleClickDistrict(district)}/>
+                                      onClick={() => !galleryMode && this.handleClickDistrict(district)}/>
                             </div>
                         ))}
                     </div>
                 </div>
                 <div className="create-game-buttons">
-                    <button onClick={() => game.handleClickCloseCreateGame()}>Отмена</button>
-                    <button className={cs({
+                    <button
+                        onClick={() => game.handleClickCloseCreateGame()}>{!galleryMode ? "Отмена" : "Закрыть"}</button>
+                    {!galleryMode ? <button className={cs({
                         inactive: playerCount < 2
-                    })}
-                            onClick={() => playerCount >= 2
-                                && game.handleClickCreateGame(
-                                    [...this.state.charactersSelected],
-                                    [...this.state.districtsSelected])}>Создать
-                    </button>
+                    })} onClick={() => playerCount >= 2
+                        && game.handleClickCreateGame(
+                            [...this.state.charactersSelected],
+                            [...this.state.districtsSelected])}>Создать
+                    </button> : ""}
                 </div>
             </div>
         </div>;
@@ -668,6 +877,13 @@ class Game extends React.Component {
         }
     }
 
+    handleClickShowCards() {
+        this.setState({
+            ...this.state,
+            showCardsPanel: true
+        });
+    }
+
     handleClickCreateGame(charactersSelected, districtsSelected) {
         this.socket.emit("start-game", charactersSelected, districtsSelected);
         this.handleClickCloseCreateGame();
@@ -676,7 +892,8 @@ class Game extends React.Component {
     handleClickCloseCreateGame() {
         this.setState({
             ...this.state,
-            showCreateGamePanel: false
+            showCreateGamePanel: false,
+            showCardsPanel: false
         });
     }
 
@@ -752,6 +969,10 @@ class Game extends React.Component {
     hasDistricts(building) {
         const data = this.state;
         return data.player && data.playerDistricts[data.userSlot] && data.playerDistricts[data.userSlot].some(card => card.type === building) && data.phase === 2
+    }
+
+    getUniqueDistricts() {
+        return ["secret_vault", "haunted_quarter", "stable", "keep", "memorial", "framework", "arsenal", "observatory", "poor_house", "monument", "basilica", "museum", "ivory_tower", "well_of_wishes", "quarry", "factory", "map_room", "capitol", "necropolis", "imperial_treasury", "forgery", "laboratory", "school_of_magic", "den_of_thieves", "theater", "dragon_gate", "park", "great_wall", "library", "gold_mine"];
     }
 
     render() {
@@ -1041,6 +1262,9 @@ class Game extends React.Component {
                     {data.showCreateGamePanel ?
                         <CreateGamePanel data={data} game={this}/>
                         : ""}
+                    {data.showCardsPanel ?
+                        <CreateGamePanel data={data} game={this} galleryMode={true}/>
+                        : ""}
                     <div className="host-controls panel">
                         <div className="side-buttons">
                             {this.state.userId === this.state.hostId ?
@@ -1056,6 +1280,10 @@ class Game extends React.Component {
                                       className={`material-icons start-game settings-button`}>play_arrow</i>)
                                 : <i onClick={() => this.handleClickStop()}
                                      className="toggle-theme material-icons settings-button">stop</i>) : ""}
+                            {!isHost
+                                ? (<i onClick={() => this.handleClickShowCards()}
+                                      className="material-icons settings-button">amp_stories</i>)
+                                : ""}
                             <i onClick={() => this.handleClickChangeName()}
                                className="toggle-theme material-icons settings-button">edit</i>
                         </div>

@@ -35,8 +35,7 @@ function init(wsServer, path) {
                 playerHand: {},
                 playerDistricts: {},
                 playerCharacter: {},
-                playerScore: {},
-                uniqueDistricts: utils.getUniqueDistricts()
+                playerScore: {}
             };
             if (testMode)
                 [1, 2, 3, 4].forEach((_, ind) => {
@@ -488,7 +487,8 @@ function init(wsServer, path) {
                     }
                 },
                 isDistrictsValid = (districts) => {
-                    if (districts.length === (new Set(districts)).size && districts.every((districts) => room.uniqueDistricts.includes(districts)))
+                    const uniqueDistricts = utils.getUniqueDistricts();
+                    if (districts.length === (new Set(districts)).size && districts.every((districts) => uniqueDistricts.includes(districts)))
                         return true;
                 },
                 includeHand = (slot, card) => state.players[slot].hand.some(building => building.type === card),

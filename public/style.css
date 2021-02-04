@@ -261,7 +261,7 @@ h1, h2, h3 {
     position: fixed;
     top: 0;
     right: 0;
-    z-index: 2;
+    z-index: 3;
 }
 
 .spectators-section.active {
@@ -885,6 +885,7 @@ button {
     align-items: center;
     justify-content: center;
     user-select: none;
+    z-index: 2;
 }
 
 .create-game-panel-modal {
@@ -1219,4 +1220,12 @@ button.inactive {
 
 .tax-counter.empty {
     opacity: 0.6;
+}
+
+.create-game-panel.galleryMode .create-game-subtitle:first-child {
+    border: none;
+}
+
+.create-game-panel.galleryMode.noPresetSelected .character-slot.selected {
+    box-shadow: none;
 }
