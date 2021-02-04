@@ -240,9 +240,11 @@ class CreateGamePanel extends React.Component {
             card = `${type}_${set}`,
             currentCharacters = this.state.charactersSelected,
             alreadyHas = currentCharacters.has(card);
+        let unsetSelectedPreset;
         if (!this.state.charactersAvailable.has(card))
             return;
         if (type === 9 && (![3, 8].includes(this.playerCount) || !alreadyHas)) {
+            unsetSelectedPreset = true;
             if (!alreadyHas) {
                 currentCharacters.delete("9_1");
                 currentCharacters.delete("9_2");
@@ -252,9 +254,14 @@ class CreateGamePanel extends React.Component {
                 currentCharacters.delete(card);
             }
         } else if (type !== 9) {
-            const currentCharactersArray = [...currentCharacters];
-            currentCharactersArray[type - 1] = card;
-            this.state.charactersSelected = new Set(currentCharactersArray);
+            unsetSelectedPreset = this.replaceCharacter(type - 1, card);
+        }
+        if (unsetSelectedPreset && this.state.presetSelected) {
+            if (!((type === 9 && alreadyHas)
+                || (type === 9 && !alreadyHas && this.presets[this.state.presetSelected].characters[8] === card)
+                || (type === 9 && this.presets[this.state.presetSelected].characters.includes("9_2") && this.playerCount < 5)
+                || (type === 4 && this.presets[this.state.presetSelected].characters.includes("4_2") && this.playerCount < 3)))
+                this.state.presetSelected = null;
         }
         this.setState(this.state);
     }
@@ -262,20 +269,28 @@ class CreateGamePanel extends React.Component {
     handleClickDistrict(district) {
         if (this.playerCount < 4 && district === "theater")
             return;
-        if (district === "theater")
-            this.state.theaterTouched = true;
         if (!this.state.districtsSelected.has(district))
             this.state.districtsSelected.add(district);
         else
             this.state.districtsSelected.delete(district);
+        this.state.presetSelected = null;
         this.setState(this.state);
     }
 
-    getPreset(game) {
+    replaceCharacter(position, character) {
+        const characters = [...this.state.charactersSelected];
+        if (characters[position] !== character) {
+            characters[position] = character;
+            this.state.charactersSelected = new Set(characters);
+            return true;
+        }
+    }
+
+    getPresets() {
         return {
-            default: {
-                name: "Оригинал",
-                desc: "Изначальный набор персонажей игры «Цитадели», вышешей в 2000-м году",
+            basic: {
+                name: "Базовая",
+                desc: "Базовый набор кварталов и персонажей. Лучше всего подходит для знакомства с игрой.",
                 characters: [
                     "1_1",
                     "2_1",
@@ -284,10 +299,21 @@ class CreateGamePanel extends React.Component {
                     "5_1",
                     "6_1",
                     "7_1",
-                    "8_1",
-                    "9_1"
+                    "8_1"
                 ],
-                quarters: game.getUniqueDistricts()
+                quarters: [
+                    "dragon_gate",
+                    "factory",
+                    "haunted_quarter",
+                    "imperial_treasury",
+                    "keep",
+                    "laboratory",
+                    "library",
+                    "map_room",
+                    "quarry",
+                    "den_of_thieves",
+                    "well_of_wishes"
+                ]
             },
             aristocrats: {
                 name: "Амбициозные аристократы",
@@ -303,7 +329,7 @@ class CreateGamePanel extends React.Component {
                     "8_3",
                     "9_2"
                 ],
-                districts: [
+                quarters: [
                     "capitol",
                     "factory",
                     "framework",
@@ -466,7 +492,7 @@ class CreateGamePanel extends React.Component {
                     "imperial_treasury",
                     "ivory_tower",
                     "laboratory",
-                    "room_of_maps",
+                    "map_room",
                     "monument",
                     "museum",
                     "school_of_magic",
@@ -478,6 +504,26 @@ class CreateGamePanel extends React.Component {
         };
     }
 
+    handleClickChangePreset(preset) {
+        this.changePreset(preset);
+        this.setState(this.state);
+    }
+
+    handleClickSelectAllDistricts() {
+        this.state.presetSelected = null;
+        this.state.districtsSelected = new Set(this.game.getUniqueDistricts());
+        this.setState(this.state);
+    }
+
+    changePreset(preset, refresh) {
+        if (this.state.presetSelected === preset && !refresh)
+            this.state.presetSelected = null;
+        else
+            this.state.presetSelected = preset;
+        this.state.charactersSelected = new Set(this.presets[preset].characters);
+        this.state.districtsSelected = new Set(this.presets[preset].quarters);
+    }
+
     render() {
         const
             data = this.props.data,
@@ -485,18 +531,31 @@ class CreateGamePanel extends React.Component {
             galleryMode = this.props.galleryMode,
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             getNineCharacterAvailable = (set) => set !== 2
-                ? (playerCount === 2
+                ? (playerCount < 3
                     ? []
                     : [`9_${set}`])
                 : (playerCount < 5
                     ? []
                     : [`9_2`]),
-            getEmperorAvailable = () => (playerCount === 2
+            getEmperorAvailable = () => (playerCount < 3
                 ? []
                 : [`4_2`]);
 
-        if (this.presets)
-            this.presets = this.getPreset(game);
+        this.game = game;
+
+        if (!this.presets)
+            this.presets = this.getPresets();
+
+        if (this.state.presetSelected === undefined || (data.phase !== 0 && this.wasNotStarted)) {
+            if (data.presetSelected)
+                this.state.presetSelected = data.presetSelected;
+            else
+                this.state.presetSelected = galleryMode ? null : "basic";
+        }
+        this.wasNotStarted = data.phase === 0;
+
+        if (this.playerCount !== playerCount && this.state.presetSelected)
+            this.changePreset(this.state.presetSelected, true)
 
         this.playerCount = playerCount;
 
@@ -513,9 +572,10 @@ class CreateGamePanel extends React.Component {
         else
             this.state.charactersSelected.forEach((character) => {
                 if (!this.state.charactersAvailable.has(character)) {
-                    this.state.charactersSelected.delete(character);
                     if (character === "4_2")
-                        this.state.charactersSelected.add("4_1");
+                        this.replaceCharacter(3, "4_1");
+                    else
+                        this.state.charactersSelected.delete(character);
                 }
             });
 
@@ -528,25 +588,40 @@ class CreateGamePanel extends React.Component {
 
         if (playerCount < 4)
             this.state.districtsSelected.delete("theater");
-        else if (!this.state.districtsSelected.has("theater") && !this.state.theaterTouched)
-            this.state.districtsSelected.add("theater");
+
+        const showAllCards = !this.state.presetSelected && galleryMode;
 
         return <div className={cs("create-game-panel", {galleryMode, noPresetSelected: !this.state.presetSelected})}>
             <div className="create-game-panel-modal">
                 <div className="create-game-title">
-                    {!galleryMode ? "Выбор набора карт" : "Галерея карт"}
+                    {!galleryMode ? `Выбор набора карт (игроков: ${playerCount})` : "Галерея карт"}
                 </div>
                 <div className="characters-panel">
+                    {/*<div className="create-game-subtitle">Комбинации</div>
+                    <div className="presets-list">
+                        {Object.keys(this.presets).map((preset) =>
+                            <div className={cs("preset-item", {selected: this.state.presetSelected === preset})}
+                                 onClick={() => this.handleClickChangePreset(preset)}>
+                                {this.presets[preset].name}
+                            </div>)}
+                    </div>
+                    <div className="preset-description">
+                        {
+                            this.state.presetSelected
+                                ? this.presets[this.state.presetSelected].desc
+                                : !galleryMode ? "Ваша собственная комбинация" : "Комбинация не выбрана"
+                        }
+                    </div>*/}
                     <div className="create-game-subtitle">Персонажи</div>
-                    <div className={cs("characters-set")}>
+                    <div className="characters-set">
                         {Array(3).fill(null).map((_, set) =>
-                            <div className={cs("characters-row")}>
+                            <div className="characters-row">
                                 {Array(9).fill(null).map((_, type) => {
                                         const card = `${type + 1}_${set + 1}`;
                                         return <div
                                             className={cs("character-slot", {
-                                                available: galleryMode || this.state.charactersAvailable.has(card),
-                                                selected: galleryMode || this.state.charactersSelected.has(card)
+                                                available: showAllCards || this.state.charactersAvailable.has(card),
+                                                selected: showAllCards || this.state.charactersSelected.has(card)
                                             })}>
                                             <Card card={card} type="character"
                                                   game={game}
@@ -557,11 +632,15 @@ class CreateGamePanel extends React.Component {
                             </div>)}
 
                     </div>
-                    <div className="create-game-subtitle">Уникальные кварталы</div>
-                    <div className={cs("district-set")}>
+                    <div className="create-game-subtitle">Уникальные кварталы
+                        {!galleryMode
+                            ? <span onClick={() => this.handleClickSelectAllDistricts()}
+                                    className="add-all-districts">(Добавить все)</span>
+                            : ""}</div>
+                    <div className="district-set">
                         {game.getUniqueDistricts().map((district) => (
                             <div className={cs("district-slot", {
-                                selected: this.state.districtsSelected.has(district)
+                                selected: showAllCards || this.state.districtsSelected.has(district)
                             })}>
                                 <Card card={{type: district}} type="card"
                                       game={game}
@@ -578,7 +657,8 @@ class CreateGamePanel extends React.Component {
                     })} onClick={() => playerCount >= 2
                         && game.handleClickCreateGame(
                             [...this.state.charactersSelected],
-                            [...this.state.districtsSelected])}>Создать
+                            [...this.state.districtsSelected],
+                            this.state.presetSelected)}>Создать
                     </button> : ""}
                 </div>
             </div>
@@ -884,8 +964,8 @@ class Game extends React.Component {
         });
     }
 
-    handleClickCreateGame(charactersSelected, districtsSelected) {
-        this.socket.emit("start-game", charactersSelected, districtsSelected);
+    handleClickCreateGame(charactersSelected, districtsSelected, presetSelected) {
+        this.socket.emit("start-game", charactersSelected, districtsSelected, presetSelected);
         this.handleClickCloseCreateGame();
     }
 

@@ -848,6 +848,19 @@ button {
     .short-rules {
         top: 146px !important;
     }
+
+    .presets-list {
+        flex-flow: column;
+    }
+
+    .preset-item {
+        width: auto !important;
+    }
+
+    .create-game-panel-modal {
+        padding-top: 39px !important;
+        box-sizing: border-box;
+    }
 }
 
 .loading-title {
@@ -894,8 +907,8 @@ button {
     max-width: 100%;
     text-align: center;
     padding: 20px;
-    max-width: 100%;
     overflow: auto;
+    max-height: 100%;
 }
 
 .create-game-panel .character.card-item {
@@ -1222,10 +1235,57 @@ button.inactive {
     opacity: 0.6;
 }
 
-.create-game-panel.galleryMode .create-game-subtitle:first-child {
-    border: none;
-}
-
 .create-game-panel.galleryMode.noPresetSelected .character-slot.selected {
     box-shadow: none;
 }
+
+.presets-list {
+    display: flex;
+    justify-content: space-between;
+}
+
+.preset-item {
+    padding: 3px 9px;
+    background: #fff1c5;
+    width: 134px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    border-left: 1px solid #b0b0b0;
+}
+
+.preset-item:first-child {
+    border-left: none;
+}
+
+
+.preset-item.selected {
+    box-shadow: 0 1px 10px 0 #5f3d32;
+    z-index: 1;
+}
+
+.noPresetSelected .preset-description {
+    box-shadow: 0 1px 8px 0 #5f3d32;
+}
+
+.preset-description {
+    height: 50px;
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    margin: 10px 0;
+    padding: 15px;
+    box-sizing: border-box;
+    justify-content: center;
+}
+
+.add-all-districts {
+    font-size: 12px;
+    position: absolute;
+    margin-left: 4px;
+    margin-top: 3px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+

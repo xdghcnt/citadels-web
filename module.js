@@ -421,6 +421,8 @@ function init(wsServer, path) {
                             }
                     }
                     room.phase = 0;
+
+                    room.presetSelected = null;
                     update();
                     updateState();
                 },
@@ -1117,9 +1119,11 @@ function init(wsServer, path) {
             };
             this.userEventHandlers = {
                 ...this.eventHandlers,
-                "start-game": (user, characters, districts) => {
+                "start-game": (user, characters, districts, presetSelected) => {
                     if (user === room.hostId && characters && characters.length && isCharactersValid(characters) && isDistrictsValid(districts)) {
                         room.characterInGame = characters;
+                        if (presetSelected)
+                            room.presetSelected = presetSelected;
                         startGame(districts);
                     }
                 },
