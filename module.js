@@ -775,6 +775,12 @@ function init(wsServer, path) {
                             room.playerDistricts[slot].push(room.playerDistricts[magistratedSlot].pop());
                             room.magistrated = [];
                             room.trueMagistrated = state.trueMagistrated;
+
+                            if (room.ender === magistratedSlot && getDistrictsCount(magistratedSlot) < state.maxDistricts)
+                                room.ender = null;
+                            if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
+                                room.ender = slot;
+                            
                             countPoints(magistratedSlot);
                             countPoints(room.currentPlayer);
                             payingSlot = slot;
