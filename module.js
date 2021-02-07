@@ -145,12 +145,17 @@ function init(wsServer, path) {
                         state.players[slot].character = [];
                         room.playerCharacter[slot] = [];
                         delete state.players[slot].trueBlackmailed;
+                        delete state.players[slot].trueMagistrated;
                     });
                     state.characterRoles = {};
 
                     room.assassined = null;
                     room.robbed = null;
                     room.witched = null;
+
+                    room.magistrated = [];
+                    room.trueMagistrated = null;
+                    state.trueMagistrated = null;
                     room.blackmailed = [];
                     room.trueBlackmailed = null;
                     state.trueBlackmailed = null;
@@ -244,7 +249,7 @@ function init(wsServer, path) {
                     room.laboratoryAction = false;
                     room.museumAction = false;
                     room.incomeAction = false;
-                    state.startTurn = false;
+                    state.firstBuilding = false;
                     if (["4_1", "4_3"].includes(room.currentCharacter)) room.king = room.currentPlayer;
                     if (waitToResponse()) {
                         update();
@@ -304,6 +309,9 @@ function init(wsServer, path) {
                         case "1_2":
                             state.players[room.currentPlayer].action = 'witch-action';
                             room.buildDistricts = -1;
+                            break;
+                        case "1_3":
+                            state.players[room.currentPlayer].action = 'magistrate-action';
                             break;
                         case "2_1":
                             state.players[room.currentPlayer].action = 'thief-action';
@@ -375,7 +383,7 @@ function init(wsServer, path) {
                 },
                 endRound = () => {
                     if (state.characterRoles["9_2"] !== undefined) {
-                        room.currentPlayer = state.characterRoles["9_2"];
+                        room.currentPlayer = state.characterRoles[room.witched === "9_2" ? "1_2" : "9_2"];
                         const king = room.characterInGame[3];
                         if (room.assassined === king && state.characterRoles[`${king}`] !== undefined) {
                             const kingPlayer = state.characterRoles[`${king}`];
@@ -385,7 +393,8 @@ function init(wsServer, path) {
                             }
                         }
                     }
-                    room.currentCharacter = 0;
+                    room.currentCharacter = "0";
+                    room.incomeAction = false;
                     if (room.assassined === "4_1" && state.characterRoles["4_1"] !== undefined) 
                         room.king = state.characterRoles["4_1"];
                     if (room.assassined === "4_3" && state.characterRoles["4_3"] !== undefined) 
@@ -469,8 +478,7 @@ function init(wsServer, path) {
                 include = (slot, card) => room.playerDistricts[slot].some(building => building.type === card),
                 isCharactersValid = (characters) => {
                     if (!([8, 9].includes(characters.length) && characters.every((character, index) => {
-                        const match = character.match(/^([1-9])_([1-3])$/); //3 char packs
-                        //const match = character.match(/^([1-9])_([1-2])$/); //2 char packs
+                        const match = character.match(/^([1-9])_([1-3])$/); 
                         return match && +match[1] === (index + 1);
                     })))
                         return false;
@@ -504,15 +512,23 @@ function init(wsServer, path) {
                     if (room.buildDistricts == -1) return;
                     if (!(room.buildDistricts || building.type === "stable" || building.wizard 
                         || (building.kind === 6 && room.currentCharacter === "6_3"))) return;
-                    if (building.type === "monument" && districts.length + 2 >= state.maxDistricts)
-                        return sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
-                    if (building.type === "secret_vault")
-                        return sendSlot(slot, "message", "Вы не можете построить Тайное убежище");
-                    if (include(slot, building.type) && !(include(slot, "quarry") || room.currentCharacter === "3_2"))
-                        return sendSlot(slot, "message", 'У вас уже есть такой квартал');
+                    if (building.type === "monument" && districts.length + 2 >= state.maxDistricts) {
+                        sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
+                        return [false, 0];
+                    }
+                    if (building.type === "secret_vault") {
+                        sendSlot(slot, "message", "Вы не можете построить Тайное убежище");
+                        return [false, 0];
+                    }
+                    if (include(slot, building.type) && !(include(slot, "quarry") || room.currentCharacter === "3_2")) {
+                        sendSlot(slot, "message", 'У вас уже есть такой квартал');
+                        return [false, 0];
+                    }
                     const cost = getDistrictCost(building) - include(slot, "factory") * (utils.districts[building.type].type === 9);
-                    if (!noRequireGold && room.playerGold[slot] < cost)
-                        return sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
+                    if (include(slot, building.type) && !(include(slot, "quarry") || room.currentCharacter === "3_2")) {
+                        sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
+                        return [false, 0];
+                    }
                     if (building.type !== "stable" && !building.wizard && !(building.kind === 6 && room.currentCharacter === "6_3"))
                         room.buildDistricts -= 1;
                     delete state.players[slot].hand[cardInd].wizard;
@@ -524,16 +540,35 @@ function init(wsServer, path) {
                     room.playerHand[slot] -= 1;
                     if (replaceCardInd !== undefined)
                         destroy(slot, replaceCardInd);
+                    if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
+                        room.ender = slot;
+                    return [true, noRequireGold ? 0 : cost];
+                },
+                wasBuilded = (slot, cost) => {
+                    const building = room.playerDistricts[slot][room.playerDistricts[slot].length - 1];
+                    const magistate = state.characterRoles["1_3"];
+                    if (magistate !== undefined && slot !== magistate && room.magistrated.includes(room.currentCharacter) && !include(magistate, building.type) && !state.firstBuilding) {
+                        state.magistrateAction = {cost: cost, action: state.players[slot].action};
+                        state.players[slot].action = null;
+                        countPoints(slot);
+                        sendStateSlot(slot);
+                        room.currentPlayer = magistate;
+                        state.players[room.currentPlayer].action = 'magistrate-open';
+                        sendStateSlot(room.currentPlayer);
+                        update();
+                        return;
+                    }
+                    state.firstBuilding = true;
+                    tax(slot);
+                },
+                tax = (slot) => {
                     if (room.characterInGame[8] === "9_3" && room.currentCharacter !== "9_3" && room.playerGold[slot]) {
                         room.playerGold[slot] -= 1;
                         room.tax += 1;
                     }
-                    if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
-                        room.ender = slot;
                     countPoints(slot);
-                    update();
                     sendStateSlot(slot);
-                    return true;
+                    update();
                 },
                 destroy = (slot_d, cardInd) => {
                     const building = room.playerDistricts[slot_d][cardInd];
@@ -623,7 +658,7 @@ function init(wsServer, path) {
                     }
                 },
                 "take-resources": (slot, res) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && !room.tookResource && ~['coins', 'card'].indexOf(res)) {
+                    if (room.phase === 2 && slot === room.currentPlayer && !room.tookResource && ~['coins', 'card'].indexOf(res)  && state.players[slot].action !== 'magistrate-open') {
                         if (res === 'coins') {
                             room.tookResource = true;
                             room.playerGold[slot] += 2;
@@ -648,7 +683,7 @@ function init(wsServer, path) {
                     }
                 },
                 "take-card": (slot, cardInd) => {
-                    if (room.phase === 3 && slot === room.currentPlayer && ~state.players[slot].choose[cardInd] && !['wizard-card-action', 'scholar-response'].includes(state.players[slot].action)) {
+                    if (room.phase === 3 && slot === room.currentPlayer && ~state.players[slot].choose[cardInd] && !['magistrate-open', 'wizard-card-action', 'scholar-response'].includes(state.players[slot].action)) {
                         state.players[slot].hand.push(...state.players[slot].choose.splice(cardInd, 1));
                         state.districtDeck.push(...state.players[slot].choose.splice(0));
                         room.playerHand[slot] += 1;
@@ -660,7 +695,7 @@ function init(wsServer, path) {
                     }
                 },
                 "take-income": (slot) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction && room.currentCharacter !== "5_2") {
+                    if (room.phase === 2 && slot === room.currentPlayer && room.incomeAction && room.currentCharacter !== "5_2" && state.players[slot].action !== 'magistrate-open') {
                         room.incomeAction = false;
                         let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
                                 .filter(type => type === state.currentIndCharacter).length
@@ -694,8 +729,10 @@ function init(wsServer, path) {
                     }
                 },
                 "build": (slot, cardInd) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && state.players[slot].hand[cardInd])
-                        build(slot, cardInd);
+                    if (room.phase === 2 && slot === room.currentPlayer && state.players[slot].hand[cardInd] && state.players[slot].action !== 'magistrate-open') {
+                        const wasBuilt = build(slot, cardInd);
+                        if (wasBuilt[0]) wasBuilded(slot, wasBuilt[1])
+                    }
                 },
                 "kill-character": (slot, char) => {
                     if (room.phase === 2 && state.players[slot].action === 'assassin-action' && room.characterInGame.indexOf(char) > 0) {
@@ -712,6 +749,43 @@ function init(wsServer, path) {
                         state.players[slot].action = null;
                         update();
                         sendStateSlot(slot);
+                    }
+                },
+                "magistrate-character": (slot, charTrue, charFalse1, charFalse2) => {
+                    if (room.phase === 2 && state.players[slot].action === 'magistrate-action' && 
+                        new Set([charTrue, charFalse1, charFalse2]).size === 3 &&
+                        [charTrue, charFalse1, charFalse2].every(char => room.characterInGame.indexOf(charTrue) > 0)) {
+                        room.magistrated = [charTrue, charFalse1, charFalse2].sort((a, b) => room.characterInGame.indexOf(a) - room.characterInGame.indexOf(b));
+                        state.trueMagistrated = charTrue;
+                        state.players[slot].trueMagistrated = charTrue;
+                        state.players[slot].action = null;
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                "magistrate-open": (slot, ans) => {
+                    if (room.phase === 2 && state.players[slot].action === 'magistrate-open' && ~['yes', 'no'].indexOf(ans)) {
+                        state.players[slot].action = null;
+                        room.phase = 2;
+                        const magistratedSlot = state.characterRoles[room.currentCharacter];
+                        let payingSlot = magistratedSlot;
+                        if (ans === 'yes' && state.trueMagistrated === room.currentCharacter) {
+                            room.playerGold[magistratedSlot] += state.magistrateAction.cost;
+                            state.alchemistCoins -= state.magistrateAction.cost;
+                            room.playerDistricts[slot].push(room.playerDistricts[magistratedSlot].pop());
+                            room.magistrated = [];
+                            room.trueMagistrated = state.trueMagistrated;
+                            countPoints(magistratedSlot);
+                            countPoints(room.currentPlayer);
+                            payingSlot = slot;
+                        }
+                        room.magistrated.splice(room.magistrated.indexOf(room.currentCharacter), 1);
+                        state.players[magistratedSlot].action = state.magistrateAction.action;
+                        sendStateSlot(magistratedSlot);
+                        sendStateSlot(room.currentPlayer);
+                        room.currentPlayer = magistratedSlot;
+                        state.firstBuilding = true;
+                        tax(payingSlot);
                     }
                 },
                 "rob-character": (slot, char) => {
@@ -1022,6 +1096,7 @@ function init(wsServer, path) {
                     if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'framework')
                         && state.players[slot].hand[cardInd]) {
                         build(slot, cardInd, getPlayerDistrictIndex(slot, "framework"), true)
+                        tax(slot);
                     }
                 },
                 "museum-action": (slot, cardInd) => {
@@ -1056,13 +1131,15 @@ function init(wsServer, path) {
                             state.players[slot].hand.findIndex((card) => card.type === "necropolis"),
                             cardInd,
                             true);
+                        tax(slot);   
                     }
                 },
                 "build-den-of-thieves": (slot, cardIndexes) => {
                     if (room.phase === 2 && slot === room.currentPlayer && includeHand(slot, 'den_of_thieves')
-                        && cardIndexes && cardIndexes.every && cardIndexes.every((cardInd) => state.players[slot].hand[cardInd])
-                        && (room.playerGold[slot] + cardIndexes.length) >= 6) {
-                        cardIndexes.splice(6);
+                        && cardIndexes && cardIndexes.every && cardIndexes.every((cardInd) => state.players[slot].hand[cardInd])) {
+                        const maxCost = 6 - include(slot, "factory");
+                        if (room.playerGold[slot] + cardIndexes.length < maxCost) return;
+                        cardIndexes.splice(maxCost);
                         const
                             cardsToDrop = state.players[slot].hand.filter((card, ind) => cardIndexes.includes(ind)),
                             wasBuilt = build(
@@ -1070,8 +1147,8 @@ function init(wsServer, path) {
                                 state.players[slot].hand.findIndex((card) => card.type === "den_of_thieves"),
                                 undefined,
                                 true);
-                        if (wasBuilt) {
-                            const cost = 6 - cardIndexes.length;
+                        if (wasBuilt[0]) {
+                            const cost = maxCost - cardIndexes.length;
                             room.playerGold[slot] -= cost;
                             state.alchemistCoins += cost;
                             room.playerHand[slot] -= cardIndexes.length;
@@ -1079,8 +1156,7 @@ function init(wsServer, path) {
                                 const _ind = state.players[slot].hand.findIndex(_card => card === _card);
                                 dropCardHand(slot, _ind);
                             })
-                            countPoints(slot);
-                            sendStateSlot(slot);
+                            wasBuilded(slot, cost);
                         }
                         update();
                     }
@@ -1098,7 +1174,7 @@ function init(wsServer, path) {
                 },
                 "end-turn": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.tookResource) {
-                        if (['witch-action', 'blackmailed-response', 'blackmailed-open', 'emperor-action', 'emperor-nores-action'].includes(state.players[slot].action)) return;
+                        if (['witch-action', 'magistrate-open', 'blackmailed-response', 'blackmailed-open', 'emperor-action', 'emperor-nores-action'].includes(state.players[slot].action)) return;
                         if (room.currentCharacter != "1_2") {
                             if (!room.playerGold[slot] && include(slot, "poor_house"))
                                 room.playerGold[slot] += 1;
