@@ -711,7 +711,7 @@ button {
     pointer-events: none;
 }
 
-.status.blackmailed svg, .status.true-blackmailed svg {
+.status .blackmailed-icon svg, .status .true-blackmailed-icon svg {
     width: 45px;
     height: 45px;
 }
@@ -736,9 +736,9 @@ button {
     position: relative;
 }
 
-.status.robbed {
+.status .robbed-icon {
     color: #ffce07 !important;
-    right: 6px;
+    margin-left: 6px;
 }
 
 .hasCrown .resources {
@@ -1157,18 +1157,18 @@ button.inactive {
     color: #7b7b7b;
 }
 
-.status.blackmailed, .status.true-blackmailed {
-    margin-left: 9px;
+.status .blackmailed-icon, .status .true-blackmailed-icon {
+    margin-left: 7px;
     color: #ffd28f !important;
     margin-top: 5px;
 }
 
-.status.true-blackmailed {
+.status .true-blackmailed-icon {
     color: #ff948f !important;
 }
 
-.status.witched {
-    right: 8px;
+.status .witched-icon {
+    margin-left: 5px;
     color: #ca74a8 !important;
 }
 
@@ -1289,3 +1289,64 @@ button.inactive {
     cursor: pointer;
 }
 
+.status .magistrated-icon svg {
+    width: 40px;
+    height: 40px;
+    margin-left: 10px;
+    margin-top: 4px;
+}
+
+.status .true-magistrated-icon svg {
+    width: 40px;
+    height: 40px;
+    margin-left: 10px;
+    margin-top: 4px;
+}
+
+.status .magistrated-icon {
+    color: white !important;
+}
+
+.status .true-magistrated-icon {
+    color: #ff9595 !important;
+}
+
+.status.two-icons .robbed-icon svg {
+    width: 35px;
+    height: 35px;
+}
+
+.status.two-icons .robbed-icon {
+    position: absolute;
+    top: -3px;
+}
+
+.status.two-icons .magistrated-icon svg {
+    width: 30px;
+}
+
+.status.two-icons .true-magistrated-icon svg {
+    width: 25px;
+}
+
+.status.two-icons .blackmailed-icon svg, .status.two-icons .true-blackmailed-icon svg {
+    width: 32px;
+}
+
+.status.two-icons .blackmailed-icon, .status.two-icons .true-blackmailed-icon {
+    position: absolute;
+    top: -13px;
+    left: -2px;
+}
+
+.status.two-icons .magistrated-icon {
+    position: absolute;
+    left: 14px;
+    top: 14px;
+}
+
+.status.two-icons .true-magistrated-icon {
+    position: absolute;
+    left: 19px;
+    top: 17px;
+}
