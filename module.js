@@ -382,7 +382,7 @@ function init(wsServer, path) {
                     sendStateSlot(room.currentPlayer);
                 },
                 endRound = () => {
-                    if (state.characterRoles["9_2"] !== undefined) {
+                    if (room.assassined !== "9_2" && state.characterRoles["9_2"] !== undefined) {
                         room.currentPlayer = state.characterRoles[room.witched === "9_2" ? "1_2" : "9_2"];
                         const king = room.characterInGame[3];
                         if (room.assassined === king && state.characterRoles[`${king}`] !== undefined) {
