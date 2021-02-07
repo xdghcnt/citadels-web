@@ -509,9 +509,9 @@ function init(wsServer, path) {
                     const
                         building = state.players[slot].hand[cardInd],
                         districts = room.playerDistricts[slot];
-                    if (room.buildDistricts == -1) return;
+                    if (room.buildDistricts === -1) return [false, 0];
                     if (!(room.buildDistricts || building.type === "stable" || building.wizard 
-                        || (building.kind === 6 && room.currentCharacter === "6_3"))) return;
+                        || (building.kind === 6 && room.currentCharacter === "6_3"))) return [false, 0];
                     if (building.type === "monument" && districts.length + 2 >= state.maxDistricts) {
                         sendSlot(slot, "message", "Вы не можете построить Монумент как последнее строение");
                         return [false, 0];
@@ -525,7 +525,7 @@ function init(wsServer, path) {
                         return [false, 0];
                     }
                     const cost = getDistrictCost(building) - include(slot, "factory") * (utils.districts[building.type].type === 9);
-                    if (include(slot, building.type) && !(include(slot, "quarry") || room.currentCharacter === "3_2")) {
+                    if (!noRequireGold && room.playerGold[slot] < cost) {
                         sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
                         return [false, 0];
                     }
@@ -1133,11 +1133,11 @@ function init(wsServer, path) {
                 "build-necropolis": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && includeHand(slot, 'necropolis')
                         && state.players[slot].hand[cardInd]) {
-                        build(slot,
+                        const wasBuilt = build(slot,
                             state.players[slot].hand.findIndex((card) => card.type === "necropolis"),
                             cardInd,
                             true);
-                        tax(slot);   
+                        if (wasBuilt[0]) tax(slot);
                     }
                 },
                 "build-den-of-thieves": (slot, cardIndexes) => {
