@@ -1035,7 +1035,7 @@ class Game extends React.Component {
             this.holdTimeout = setTimeout(() => {
                 if (!this.wasReleased)
                     this.zoomCard(node);
-            }, 150);
+            }, 400);
         }
     }
 
@@ -1125,36 +1125,48 @@ class Game extends React.Component {
                         <div className="character-section">
                             <div className="cards-list">
                                 {data.characterInGame.map((card, id) => {
-                                    const trueBlackmailed = data.trueBlackmailed === card || (data.player && data.player.trueBlackmailed === card && data.blackmailed.includes(card)),
-                                    trueMagistrated = data.trueMagistrated === card || (data.player && data.player.trueMagistrated === card && data.magistrated.includes(card));
-                                    return <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
+                                    const
+                                        magistrated = data.magistrated.includes(card),
+                                        blackmailed = data.blackmailed.includes(card),
+                                        robbed = card === data.robbed,
+                                        assassined = card === data.assassined,
+                                        witched = card === data.witched,
+                                        trueBlackmailed = data.trueBlackmailed === card || (data.player && data.player.trueBlackmailed === card && data.blackmailed.includes(card)),
+                                        trueMagistrated = data.trueMagistrated === card || (data.player && data.player.trueMagistrated === card && data.magistrated.includes(card));
+                                    return <div className={cs("token-slot", {
+                                        discard: ~data.characterFace.indexOf(card),
+                                    })}>
                                         <div className={cs("status", {
-                                            assassined: card === data.assassined,
-                                            witched: card === data.witched,
-                                            robbed: card === data.robbed,
-                                            blackmailed: data.blackmailed.includes(card) || data.magistrated.includes(card),
-                                            "true-blackmailed": trueBlackmailed || trueMagistrated
+                                            "two-icons": magistrated && (robbed || blackmailed),
+                                            magistrated, blackmailed, robbed, assassined, witched
                                         })}>
-                                            {card === data.assassined ?
-                                                <ReactInlineSVG.default src="/citadels/icons/assassinated.svg"/>
+                                            {assassined ?
+                                                <ReactInlineSVG.default src="/citadels/icons/assassinated.svg"
+                                                                        className="assassined-icon"/>
                                                 : null}
-                                            {card === data.robbed ?
-                                                <ReactInlineSVG.default src="/citadels/icons/robbed.svg"/>
+                                            {robbed ?
+                                                <ReactInlineSVG.default src="/citadels/icons/robbed.svg"
+                                                                        className="robbed-icon"/>
                                                 : null}
-                                            {card === data.witched ?
-                                                <ReactInlineSVG.default src="/citadels/icons/witched.svg"/>
+                                            {witched ?
+                                                <ReactInlineSVG.default src="/citadels/icons/witched.svg"
+                                                                        className="witched-icon"/>
                                                 : null}
-                                            {!trueBlackmailed && data.blackmailed.includes(card) ?
-                                                <ReactInlineSVG.default src="/citadels/icons/blackmailed.svg"/>
+                                            {!trueBlackmailed && blackmailed ?
+                                                <ReactInlineSVG.default src="/citadels/icons/blackmailed.svg"
+                                                                        className="blackmailed-icon"/>
                                                 : null}
                                             {trueBlackmailed ?
-                                                <ReactInlineSVG.default src="/citadels/icons/blackmailed-true.svg"/>
+                                                <ReactInlineSVG.default src="/citadels/icons/blackmailed-true.svg"
+                                                                        className="true-blackmailed-icon"/>
                                                 : null}
-                                            {!trueMagistrated && data.magistrated.includes(card) ?
-                                                <ReactInlineSVG.default src="/citadels/icons/scroll_close.svg"/>
+                                            {!trueMagistrated && magistrated ?
+                                                <ReactInlineSVG.default src="/citadels/icons/scroll-close.svg"
+                                                                        className="magistrated-icon"/>
                                                 : null}
                                             {trueMagistrated ?
-                                                <ReactInlineSVG.default src="/citadels/icons/scroll_open.svg"/>
+                                                <ReactInlineSVG.default src="/citadels/icons/scroll-open.svg"
+                                                                        className='true-magistrated-icon'/>
                                                 : null}
                                         </div>
                                         <Card key={id} card={card} type="character" game={this}
@@ -1200,9 +1212,9 @@ class Game extends React.Component {
                                 {data.phase == 2 && ['assassin-action', 'witch-action', 'magistrate-action'].includes(data.player.action) && !data.userAction ?
                                     <div className="choose-character">
                                         <p className="status-text">Выберите персонажа
-                                            для {data.player.action === "witch-action" ? "колдовства" : 
-                                            data.player.action === "assassin-action" ? "убийства" :
-                                            data.cardChosen.length == 0 ? "ордера" : "блефа"}</p>
+                                            для {data.player.action === "witch-action" ? "колдовства" :
+                                                data.player.action === "assassin-action" ? "убийства" :
+                                                    data.cardChosen.length == 0 ? "ордера" : "блефа"}</p>
                                         <div className="cards-list">
                                             {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.characterInGame.indexOf(id) < 1)).map((card, id) => (
                                                 <Card key={id} card={card} type="character" game={this}
@@ -1269,7 +1281,8 @@ class Game extends React.Component {
                                             </span> : null}
                                         {blackmailedOpenAction || magistrateOpenAction ?
                                             <button onClick={() => this.handleTokenOpen('no')}>Оставить
-                                                свой {blackmailedOpenAction ? "шантаж" : "орден"} в тайне</button> : null}
+                                                свой {blackmailedOpenAction ? "шантаж" : "орден"} в
+                                                тайне</button> : null}
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
                                                 монеты</button> : null}
