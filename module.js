@@ -385,7 +385,6 @@ function init(wsServer, path) {
                         }
                     }
                     room.currentCharacter = 0;
-                    room.incomeAction = false;
                     if (room.assassined === "4_1" && state.characterRoles["4_1"] !== undefined) 
                         room.king = state.characterRoles["4_1"];
                     if (room.assassined === "4_3" && state.characterRoles["4_3"] !== undefined) 
