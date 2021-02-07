@@ -99,6 +99,7 @@ class Card extends React.Component {
             backgroundImageZoomed = getBackgroundImage(),
             cardChosen = this.props.play === undefined && data.userAction != null && data.cardChosen.includes(this.props.id),
             blackmailedChosen = data.cardChosen.includes(card) && !isToken,
+            magistrateNotChosen = data.player && data.player.action === 'magistrate-action' && data.cardChosen.indexOf(card) > 0 && !isToken,
             diplomatCard = data.player && data.player.action === 'diplomat-action' && this.props.play && !isCharacter
                 && data.cardChosen[0] === this.props.slot && data.cardChosen[1] === this.props.id,
             currentCharacter = data.currentCharacter === card && isToken,
@@ -106,6 +107,7 @@ class Card extends React.Component {
         return (
             <div className={cs(type, "card-item", {
                 "card-chosen": cardChosen || blackmailedChosen || diplomatCard,
+                "card-not-chosen": magistrateNotChosen,
                 "card-wizard": card.wizard,
                 "current-character": currentCharacter,
                 "secret-vault": isSecretVault,
@@ -562,7 +564,7 @@ class CreateGamePanel extends React.Component {
         this.state.charactersAvailable = new Set([
             "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
             "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getNineCharacterAvailable(2),
-            "4_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3) //"1_3", "2_3", "3_3", "5_3"
+            "1_3", "4_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3) //"2_3", "3_3", "5_3"
         ]);
 
         if (!this.state.charactersSelected)
@@ -817,8 +819,10 @@ class Game extends React.Component {
         this.socket.emit('blackmailed-response', res)
     }
 
-    handleBlackmailedOpen(res) {
-        this.socket.emit('blackmailed-open', res)
+    handleTokenOpen(res) {
+        this.state.player.action === 'magistrate-open' ?
+            this.socket.emit('magistrate-open', res) :
+            this.socket.emit('blackmailed-open', res)
     }
 
     handleMagician(slot, cards) {
@@ -866,6 +870,13 @@ class Game extends React.Component {
     handleActionRank1(char) {
         if (this.state.player.action == 'assassin-action') this.socket.emit("kill-character", char);
         if (this.state.player.action == 'witch-action') this.socket.emit("bewitch-character", char);
+        if (this.state.player.action == 'magistrate-action') {
+            this.toggleCardChoose(char);
+            if (this.state.cardChosen.length == 3) {
+                this.socket.emit("magistrate-character", this.state.cardChosen[0], this.state.cardChosen[1], this.state.cardChosen[2]);
+                this.handleStopUserAction();
+            }
+        }
     }
 
     handleActionRank2(char) {
@@ -1060,6 +1071,7 @@ class Game extends React.Component {
             data = this.state,
             isHost = data.hostId === data.userId,
             playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
+            magistrateOpenAction = data.player && data.player.action === 'magistrate-open' && data.phase === 2,
             blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
             blackmailedOpenAction = data.player && data.player.action === 'blackmailed-open' && data.phase === 2,
             magicianAction = data.player && data.player.action === 'magician-action' && data.phase === 2,
@@ -1082,7 +1094,8 @@ class Game extends React.Component {
                         .map((value, slot) => !data.teamsLocked ? slot : value) : activeSlots)
                     : activeSlots).map((n) => parseInt(n));
             const districtCardsMinimized = data.player && data.currentPlayer === data.userSlot && ((data.phase === 1)
-                || data.phase == 3 || data.phase === 2 && (['assassin-action', 'thief-action', 'witch-action', 'blackmailer-action'].includes(data.player.action)));
+                || data.phase == 3 || data.phase === 2 && (['assassin-action', 'thief-action', 'witch-action', 'blackmailer-action', 'magistrate-action'].includes(data.player.action))
+                && !necropolisAction && !denOfThievesAction);
             const
                 userActionText = {
                     magician: "Выберите карты для сброса",
@@ -1095,7 +1108,7 @@ class Game extends React.Component {
                     abbat: "Количество дохода, получаемое картами"
                 }[data.userAction];
             let incomeValue = 0;
-            if (data.incomeAction) {
+            if (data.incomeAction && !magistrateOpenAction) {
                 const kindIncome = data.currentCharacter.split('_')[0];
                 incomeValue = data.playerDistricts[data.userSlot] ? data.playerDistricts[data.userSlot].filter(card => card.kind === Number(kindIncome)).length
                     + data.playerDistricts[data.userSlot].some(card => card.type === "school_of_magic") : 0;
@@ -1112,14 +1125,15 @@ class Game extends React.Component {
                         <div className="character-section">
                             <div className="cards-list">
                                 {data.characterInGame.map((card, id) => {
-                                    const trueBlackmailed = data.trueBlackmailed === card || (data.player && data.player.trueBlackmailed === card && data.blackmailed.includes(card));
+                                    const trueBlackmailed = data.trueBlackmailed === card || (data.player && data.player.trueBlackmailed === card && data.blackmailed.includes(card)),
+                                    trueMagistrated = data.trueMagistrated === card || (data.player && data.player.trueMagistrated === card && data.magistrated.includes(card));
                                     return <div className={~data.characterFace.indexOf(card) ? 'discard' : ''}>
                                         <div className={cs("status", {
                                             assassined: card === data.assassined,
                                             witched: card === data.witched,
                                             robbed: card === data.robbed,
-                                            blackmailed: data.blackmailed.includes(card),
-                                            "true-blackmailed": trueBlackmailed
+                                            blackmailed: data.blackmailed.includes(card) || data.magistrated.includes(card),
+                                            "true-blackmailed": trueBlackmailed || trueMagistrated
                                         })}>
                                             {card === data.assassined ?
                                                 <ReactInlineSVG.default src="/citadels/icons/assassinated.svg"/>
@@ -1135,6 +1149,12 @@ class Game extends React.Component {
                                                 : null}
                                             {trueBlackmailed ?
                                                 <ReactInlineSVG.default src="/citadels/icons/blackmailed-true.svg"/>
+                                                : null}
+                                            {!trueMagistrated && data.magistrated.includes(card) ?
+                                                <ReactInlineSVG.default src="/citadels/icons/scroll_close.svg"/>
+                                                : null}
+                                            {trueMagistrated ?
+                                                <ReactInlineSVG.default src="/citadels/icons/scroll_open.svg"/>
                                                 : null}
                                         </div>
                                         <Card key={id} card={card} type="character" game={this}
@@ -1177,10 +1197,12 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
-                                {data.phase == 2 && ['assassin-action', 'witch-action'].includes(data.player.action) && !data.userAction ?
+                                {data.phase == 2 && ['assassin-action', 'witch-action', 'magistrate-action'].includes(data.player.action) && !data.userAction ?
                                     <div className="choose-character">
                                         <p className="status-text">Выберите персонажа
-                                            для {data.player.action === "witch-action" ? "колдовства" : "убийства"}</p>
+                                            для {data.player.action === "witch-action" ? "колдовства" : 
+                                            data.player.action === "assassin-action" ? "убийства" :
+                                            data.cardChosen.length == 0 ? "ордера" : "блефа"}</p>
                                         <div className="cards-list">
                                             {data.characterInGame.filter(id => !(~data.characterFace.indexOf(id) || data.characterInGame.indexOf(id) < 1)).map((card, id) => (
                                                 <Card key={id} card={card} type="character" game={this}
@@ -1215,14 +1237,14 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && !data.userAction ?
                                     <div className="action-button">
-                                        {!data.tookResource ?
+                                        {!data.tookResource && !magistrateOpenAction ?
                                             <button onClick={() => this.handleTakeResource('coins')}>Получить 2
                                                 монеты</button> : null}
-                                        {!data.tookResource ?
+                                        {!data.tookResource && !magistrateOpenAction ?
                                             <span className="button-or">
                                                 или
                                             </span> : null}
-                                        {!data.tookResource ?
+                                        {!data.tookResource && !magistrateOpenAction ?
                                             <button onClick={() => this.handleTakeResource('card')}>Взять
                                                 карту</button> : null}
                                         {magicianAction ?
@@ -1238,16 +1260,16 @@ class Game extends React.Component {
                                         {blackmailedResponseAction ?
                                             <button onClick={() => this.handleBlackmailedResponse('no')}>Отказаться от
                                                 откупа</button> : null}
-                                        {blackmailedOpenAction ?
-                                            <button onClick={() => this.handleBlackmailedOpen('yes')}>Раскрыть
-                                                шантаж</button> : null}
-                                        {blackmailedOpenAction ?
+                                        {blackmailedOpenAction || magistrateOpenAction ?
+                                            <button onClick={() => this.handleTokenOpen('yes')}>Раскрыть
+                                                свой {blackmailedOpenAction ? "шантаж" : "орден"}</button> : null}
+                                        {blackmailedOpenAction || magistrateOpenAction ?
                                             <span className="button-or">
                                                 или
                                             </span> : null}
-                                        {blackmailedOpenAction ?
-                                            <button onClick={() => this.handleBlackmailedOpen('no')}>Оставить
-                                                шантаж в тайне</button> : null}
+                                        {blackmailedOpenAction || magistrateOpenAction ?
+                                            <button onClick={() => this.handleTokenOpen('no')}>Оставить
+                                                свой {blackmailedOpenAction ? "шантаж" : "орден"} в тайне</button> : null}
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
                                                 монеты</button> : null}
@@ -1278,7 +1300,7 @@ class Game extends React.Component {
                                         {incomeValue ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
                                                 доход ({incomeValue})</button> : null}
-                                        {data.tookResource && !blackmailedResponseAction && !blackmailedOpenAction && !emperorAction && !emperor ?
+                                        {data.tookResource && !magistrateOpenAction && !blackmailedResponseAction && !blackmailedOpenAction && !emperorAction && !emperor ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
