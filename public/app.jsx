@@ -153,6 +153,7 @@ class PlayerSlot extends React.Component {
             wizardAction = data.player && data.player.action === 'wizard-player-action' && data.phase === 2,
             emperorAction = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2 && data.playerChosen === null,
             abbatAction = data.player && data.player.action === 'abbat-action' && data.phase === 2,
+            spyAction = data.player && data.player.action === 'spy-action' && data.phase === 2,
             maxMoney = Math.max(...Object.values(data.playerGold)),
             isBigMoney = data.playerGold[slot] === maxMoney && data.playerGold[data.userSlot] !== maxMoney,
             playerChosen = data.playerChosen === slot,
@@ -164,8 +165,8 @@ class PlayerSlot extends React.Component {
                 "my-turn": isMyTurn,
                 "winner": isWinner,
                 "player-chosen": playerChosen,
-                "hasCrown": data.king == slot,
-                "seer-return": slot === data.playerSlots.indexOf(player)
+                "hasCrown": data.king === slot,
+                "seer-return": slot === data.seerReturnSlot
             })}>
                 <div className="profile">
                     <div className="profile-bg"/>
@@ -196,6 +197,9 @@ class PlayerSlot extends React.Component {
                             : null}
                         {abbatAction && slot != data.userSlot && isBigMoney ?
                             <button onClick={() => game.handleAbbat(slot)}>Забрать монету</button>
+                            : null}
+                        {spyAction && slot != data.userSlot && data.playerHand[slot] ?
+                            <button onClick={() => game.handleSpy(slot)}>Посмотреть карты</button>
                             : null}
                     </div>
                     {data.playerCharacter[slot] ?
@@ -615,7 +619,6 @@ class CreateGamePanel extends React.Component {
                                 : !galleryMode ? "Ваша собственная комбинация" : "Комбинация не выбрана"
                         }
                     </div>
-                    *
                     <div className="create-game-subtitle">Персонажи</div>
                     <div className="characters-set">
                         {Array(3).fill(null).map((_, set) =>
@@ -806,6 +809,8 @@ class Game extends React.Component {
             if (this.state.player.hand[cardInd].type !== "den_of_thieves")
                 this.toggleCardChoose(cardInd);
         } else if (this.state.userAction === "necropolis") {
+        } else if (this.state.player.action === "seer-return") {
+            this.socket.emit("seer-return", cardInd);
         } else {
             const cardType = this.state.player.hand[cardInd].type;
             if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts > 0)
@@ -853,12 +858,28 @@ class Game extends React.Component {
         this.socket.emit('abbat-steal', slot)
     }
 
+    handleSpy(slot) {
+        this.setState(Object.assign(this.state, {
+            userAction: 'spy',
+            playerChosen: slot
+        }));
+    }
+
     handleNavigatorResource(res) {
         this.socket.emit('navigator-resources', res)
     }
 
     handleSeerAction() {
         this.socket.emit('seer-action');
+    }
+
+    handleSpyChooseDistrict(districtType) {
+        this.socket.emit('spy-choose-player', this.state.playerChosen, districtType);
+        this.handleStopUserAction();
+    }
+
+    handleSpyCardsEnd() {
+        this.socket.emit('spy-cards-end');
     }
 
     handleScholar() {
@@ -1084,6 +1105,7 @@ class Game extends React.Component {
             emperorAction = data.player && data.userAction === 'emperor' && data.phase === 2,
             abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
             seerAction = data.player && data.player.action === 'seer-action' && data.phase === 2,
+            spyUserAction = data.player && data.userAction === 'spy' && data.phase === 2,
             navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
             necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
@@ -1111,7 +1133,8 @@ class Game extends React.Component {
                     necropolis: "Вы можете выбрать квартал для разрушения",
                     den_of_thieves: "Вы можете выбрать карты для оплаты",
                     emperor: "Выберите ресурс, за который вы отдадите корону",
-                    abbat: "Количество дохода, получаемое картами"
+                    abbat: "Количество дохода, получаемое картами",
+                    spy: "Выберите вид квартала"
                 }[data.userAction];
             let incomeValue = 0;
             if (data.incomeAction && !magistrateOpenAction) {
@@ -1245,7 +1268,8 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && data.player.action === "seer-return" ?
                                     <div className="status-text" className="choose-character">
-                                        <p className="status-text" className="status-text">Выберите карту, чтобы отдать её</p>
+                                        <p className="status-text" className="status-text">Выберите карту, чтобы отдать
+                                            её</p>
                                     </div>
                                     : null}
                                 {data.phase == 1.5 ?
@@ -1332,9 +1356,18 @@ class Game extends React.Component {
                                     </div>
                                     : null}
 
-                                {data.phase == 3 ?
+                                {data.phase === 3 ?
                                     <div className="choose-card">
-                                        <p className="status-text">Выберите карту</p>
+                                        <p className="status-text">{
+                                            data.player.action !== "spy-cards"
+                                                ? "Выберите карту"
+                                                : "Просмотр карт"
+                                        }</p>
+                                        {data.player.action
+                                            ? <div className="action-button">
+                                                <button onClick={() => this.handleSpyCardsEnd()}>Продолжить</button>
+                                            </div>
+                                            : ""}
                                         <div className="cards-list">
                                             {data.player && data.player.choose && data.player.choose.map((card, id) => (
                                                 <Card key={id} card={card} type="card" game={this}
@@ -1372,6 +1405,21 @@ class Game extends React.Component {
                                                 ([...Array(incomeValue + 1).keys()].map((i) => (
                                                     <button
                                                         onClick={() => this.handleAbbatIncome(i)}>{i} к.</button>))) : null}
+                                            {spyUserAction ?
+                                                <button onClick={() => this.handleSpyChooseDistrict(4)}>Дворянский
+                                                </button> : null}
+                                            {spyUserAction ?
+                                                <button onClick={() => this.handleSpyChooseDistrict(5)}>Церковный
+                                                </button> : null}
+                                            {spyUserAction ?
+                                                <button onClick={() => this.handleSpyChooseDistrict(6)}>Торговый
+                                                </button> : null}
+                                            {spyUserAction ?
+                                                <button onClick={() => this.handleSpyChooseDistrict(8)}>Воинский
+                                                </button> : null}
+                                            {spyUserAction ?
+                                                <button onClick={() => this.handleSpyChooseDistrict(9)}>Особый
+                                                </button> : null}
                                         </div>
                                     </div>
                                     : null}

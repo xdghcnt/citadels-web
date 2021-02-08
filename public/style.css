@@ -1350,3 +1350,7 @@ button.inactive {
     left: 19px;
     top: 17px;
 }
+
+.player-slot.seer-return {
+    box-shadow: 0 0 6px 3px #346bf0;
+}
