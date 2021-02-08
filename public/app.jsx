@@ -164,7 +164,8 @@ class PlayerSlot extends React.Component {
                 "my-turn": isMyTurn,
                 "winner": isWinner,
                 "player-chosen": playerChosen,
-                "hasCrown": data.king == slot
+                "hasCrown": data.king == slot,
+                "seer-return": slot === data.playerSlots.indexOf(player)
             })}>
                 <div className="profile">
                     <div className="profile-bg"/>
@@ -557,14 +558,14 @@ class CreateGamePanel extends React.Component {
         this.wasNotStarted = data.phase === 0;
 
         if (this.playerCount !== playerCount && this.state.presetSelected)
-            this.changePreset(this.state.presetSelected, true)
+            this.changePreset(this.state.presetSelected, true);
 
         this.playerCount = playerCount;
 
         this.state.charactersAvailable = new Set([
             "1_1", "2_1", "3_1", "4_1", "5_1", "6_1", "7_1", "8_1", ...getNineCharacterAvailable(1),
             "1_2", "2_2", "3_2", ...getEmperorAvailable(), "5_2", "6_2", "7_2", "8_2", ...getNineCharacterAvailable(2),
-            "1_3", "4_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3) //"2_3", "3_3", "5_3"
+            "1_3", "2_3", "3_3", "4_3", "5_3", "6_3", "7_3", "8_3", ...getNineCharacterAvailable(3)
         ]);
 
         if (!this.state.charactersSelected)
@@ -599,7 +600,7 @@ class CreateGamePanel extends React.Component {
                     {!galleryMode ? `Выбор набора карт (игроков: ${playerCount})` : "Галерея карт"}
                 </div>
                 <div className="characters-panel">
-                    {/*<div className="create-game-subtitle">Комбинации</div>
+                    <div className="create-game-subtitle">Комбинации</div>
                     <div className="presets-list">
                         {Object.keys(this.presets).map((preset) =>
                             <div className={cs("preset-item", {selected: this.state.presetSelected === preset})}
@@ -613,7 +614,8 @@ class CreateGamePanel extends React.Component {
                                 ? this.presets[this.state.presetSelected].desc
                                 : !galleryMode ? "Ваша собственная комбинация" : "Комбинация не выбрана"
                         }
-                    </div>*/}
+                    </div>
+                    *
                     <div className="create-game-subtitle">Персонажи</div>
                     <div className="characters-set">
                         {Array(3).fill(null).map((_, set) =>
@@ -855,6 +857,10 @@ class Game extends React.Component {
         this.socket.emit('navigator-resources', res)
     }
 
+    handleSeerAction() {
+        this.socket.emit('seer-action');
+    }
+
     handleScholar() {
         this.socket.emit('scholar-action')
     }
@@ -1070,7 +1076,6 @@ class Game extends React.Component {
         const
             data = this.state,
             isHost = data.hostId === data.userId,
-            playerCount = data.playerSlots && data.playerSlots.filter((slot) => slot !== null).length,
             magistrateOpenAction = data.player && data.player.action === 'magistrate-open' && data.phase === 2,
             blackmailedResponseAction = data.player && data.player.action === 'blackmailed-response' && data.phase === 2,
             blackmailedOpenAction = data.player && data.player.action === 'blackmailed-open' && data.phase === 2,
@@ -1078,6 +1083,7 @@ class Game extends React.Component {
             emperor = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2,
             emperorAction = data.player && data.userAction === 'emperor' && data.phase === 2,
             abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
+            seerAction = data.player && data.player.action === 'seer-action' && data.phase === 2,
             navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
             necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
@@ -1237,6 +1243,11 @@ class Game extends React.Component {
                                         </div>
                                     </div>
                                     : null}
+                                {data.phase == 2 && data.player.action === "seer-return" ?
+                                    <div className="status-text" className="choose-character">
+                                        <p className="status-text" className="status-text">Выберите карту, чтобы отдать её</p>
+                                    </div>
+                                    : null}
                                 {data.phase == 1.5 ?
                                     <>
                                         <p className="status-text">Выберите игрока для обмена персонажем</p>
@@ -1293,6 +1304,9 @@ class Game extends React.Component {
                                         {navigatorAction ?
                                             <button onClick={() => this.handleNavigatorResource('card')}>Получить
                                                 4 карты</button> : null}
+                                        {seerAction ?
+                                            <button onClick={() => this.handleSeerAction()}>Действие провидицы
+                                            </button> : null}
                                         {this.state.player.action === 'scholar-action' ?
                                             <button onClick={() => this.handleScholar()}>Раскопать
                                                 карту</button> : null}

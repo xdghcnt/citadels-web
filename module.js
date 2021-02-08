@@ -319,17 +319,27 @@ function init(wsServer, path) {
                         case "2_2":
                             state.players[room.currentPlayer].action = 'blackmailer-action';
                             break;
+                        case "2_3":
+                            state.players[room.currentPlayer].action = 'spy-action';
+                            break;
                         case "3_1":
                             state.players[room.currentPlayer].action = 'magician-action';
                             break;
                         case "3_2":
                             state.players[room.currentPlayer].action = 'wizard-player-action';
                             break;
+                        case "3_3":
+                            state.players[room.currentPlayer].action = 'seer-action';
+                            room.buildDistricts = 2;
+                            break;
                         case "4_2":
                             state.players[room.currentPlayer].action = 'emperor-action';
                             break;
                         case "5_2":
                             state.players[room.currentPlayer].action = 'abbat-action';
+                            break;
+                        case "5_3":
+                            state.players[room.currentPlayer].action = 'cardinal-action';
                             break;
                         case "6_1":
                             room.playerGold[room.currentPlayer] += 1;
@@ -862,6 +872,38 @@ function init(wsServer, path) {
                         startTurn();
                     }
                 },
+                "spy-choose-player": (slot, slot_d, districtType) => {
+                    if (room.phase === 2 && state.players[slot].action === 'spy-action' && state.players[slot] 
+                        && slot !== slot_d && room.characterInGame.indexOf(charTrue) > 1 && room.playerHand[slot_d]
+                        && [4, 5, 6, 8, 9].includes(districtType)) {
+                        room.spyTarget = slot_d;
+                        state.players[slot].action = 'spy-cards';
+                        const targetHand = state.players[slot_d].hand;
+                        state.players[slot].choose = targetHand;
+                        state.players[slot_d].hand = [];
+                        const spyedCardsCount = targetHand.reduce((acc, current) => {
+                            if (current.kind === districtType)
+                                acc++;
+                        }, 0);
+                        room.playerGold[slot] += spyedCardsCount;
+                        room.playerHand[slot] += spyedCardsCount;
+                        state.players[slot].hand.push(...state.districtDeck.splice(0, spyedCardsCount));
+                        update();
+                        sendStateSlot(slot_d);
+                        sendStateSlot(slot);
+                    }
+                },
+                "spy-cards-end": (slot) => {
+                    if (room.phase === 2 && state.players[slot].action === 'spy-cards') {
+                        state.players[slot].action = null;
+                        state.players[room.spyTarget].hand = players[slot].choose;
+                        players[slot].choose = null;
+                        room.spyTarget = null;
+                        update();
+                        sendStateSlot(slot_d);
+                        sendStateSlot(slot);
+                    }
+                },
                 "exchange-hand": (slot, slot_d, cardInds) => {
                     if (room.phase === 2 && state.players[slot].action === 'magician-action' && state.players[slot_d]) {
                         state.players[slot].action = null;
@@ -914,6 +956,35 @@ function init(wsServer, path) {
                         update();
                     }
                 },
+                "seer-action": (slot) => {
+                    if (room.phase === 2 && state.players[slot].action === 'seer-action') {
+                        state.players[slot].action = 'seer-return';
+                        room.seerReturnInd = 0;
+                        Object.keys(state.players).forEach((playerInd) => {
+                            state.players[slot].hand.push(...state.players[playerInd].hand.splice(
+                                    Math.floor(Math.random() * state.players[playerInd].hand.length), 1
+                                )
+                            );
+                        });
+                        update();
+                        updateState();
+                    }
+                },
+                "seer-return": (slot, cardInd) => {
+                    if (room.phase === 2 && state.players[slot].action === 'seer-return') {
+                        state.players[room.seerReturnInd].hand.push(
+                            ...state.players[slot].hand.splice(cardInd, 1)
+                        );
+                        countPoints(room.seerReturnInd);
+                        room.seerReturnInd++;
+                        if (!players[room.seerReturnInd]) {
+                            room.action = null;
+                            room.seerReturnInd = null;
+                        }
+                        update();
+                        sendStateSlot();
+                    }
+                },
                 "emperor-crown": (slot, slot_d, res) => {
                     if (room.phase === 2 && ['emperor-action', 'emperor-nores-action'].includes(state.players[slot].action) && state.players[slot_d] 
                         && slot !== slot_d && room.king !== slot_d && ~['coin', 'card'].indexOf(res)) {
@@ -952,6 +1023,31 @@ function init(wsServer, path) {
                         countPoints(slot_d);
                         sendStateSlot(slot);
                         update();
+                    }
+                },
+                "cardinal-sell": (slot, slot_d, cardInd, sellCardInds) => {
+                    if (room.phase === 2 && state.players[slot].action === "cardinal-action" && state.players[slot_d] && slot !== slot_d
+                        && state.players[slot].hand[cardInd] && sellCardInds && sellCardInds.every 
+                        && sellCardInds.every((card) => state.players[slot].cards[card]) && !sellCardInds.includes(cardInd) 
+                        && state.players[slot].hand[cardInd].cost - room.playerGold === sellCardInds.length
+                        && sellCardInds.length <= room.playerGold[slot_d]) {
+                        const wasBuilt = build(slot, cardInd, undefined, true)[0];
+                        if (wasBuilt) {
+                            wasBuilded(slot, room.playerGold[slot]);
+                            room.playerGold[slot] = 0;
+                            room.playerGold[slot_d] -= sellCardInds.length;
+                            sellCardInds.forEach((cardInd) => {
+                                state.players[slot_d].hand.push(...state.players[slot].hand.splice(cardInd, 1));
+                            });
+                            room.playerHand[slot] = state.players[slot].hand.length;
+                            room.playerHand[slot_d] = state.players[slot_d].hand.length;
+                            state.players[slot].action = null;
+                            countPoints(slot);
+                            countPoints(slot_d);
+                            sendStateSlot(slot);
+                            sendStateSlot(slot_d);
+                            update();   
+                        }
                     }
                 },
                 "navigator-resources": (slot, res) => {
