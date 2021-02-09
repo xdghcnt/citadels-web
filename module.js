@@ -484,8 +484,9 @@ function init(wsServer, path) {
                         districtsCount++;
                     return districtsCount;
                 },
-                getDistrictCost = (card) => utils.districts[card.type].cost + (card.decoration ? 1 : 0),
                 include = (slot, card) => room.playerDistricts[slot].some(building => building.type === card),
+                getDistrictCost = (card) => card.cost + (card.decoration ? 1 : 0),
+                getBuildCost = (slot, card) => card.cost - ((include(slot, "factory") && card.type === 9) ? 1 : 0),
                 isCharactersValid = (characters) => {
                     if (!([8, 9].includes(characters.length) && characters.every((character, index) => {
                         const match = character.match(/^([1-9])_([1-3])$/);
@@ -534,7 +535,7 @@ function init(wsServer, path) {
                         sendSlot(slot, "message", 'У вас уже есть такой квартал');
                         return [false, 0];
                     }
-                    const cost = getDistrictCost(building) - include(slot, "factory") * (utils.districts[building.type].type === 9);
+                    const cost = getBuildCost(slot, building);
                     if (!noRequireGold && room.playerGold[slot] < cost) {
                         sendSlot(slot, "message", `У вас не хватает монет (${room.playerGold[slot]}/${cost}).`);
                         return [false, 0];
@@ -711,7 +712,7 @@ function init(wsServer, path) {
                         let income = room.playerDistricts[slot].map(card => utils.districts[card.type].type)
                                 .filter(type => type === state.currentIndCharacter).length
                             + include(slot, "school_of_magic");
-                        if (room.currentCharacter !== "4_3")
+                        if (!["4_3", "5_3"].includes(room.currentCharacter))
                             room.playerGold[slot] += income;
                         else {
                             state.players[slot].hand.push(...state.districtDeck.splice(0, income));
@@ -886,7 +887,9 @@ function init(wsServer, path) {
                                 acc++;
                             return acc;
                         }, 0);
-                        room.playerGold[slot] += spyedCardsCount;
+                        const goldTaken = Math.min(room.playerGold[slot_d], spyedCardsCount);
+                        room.playerGold[slot_d] -= goldTaken;
+                        room.playerGold[slot] += goldTaken;
                         room.playerHand[slot] += spyedCardsCount;
                         state.players[slot].hand.push(...state.districtDeck.splice(0, spyedCardsCount));
                         room.phase = 3;
@@ -970,7 +973,9 @@ function init(wsServer, path) {
                                 Math.floor(Math.random() * state.players[playerInd].hand.length), 1
                                 )
                             );
+                            room.playerHand[playerInd] = state.players[playerInd].hand.length;
                         });
+                        room.playerHand[slot] = state.players[slot].hand.length;
                         update();
                         updateState();
                     }
@@ -988,6 +993,8 @@ function init(wsServer, path) {
                             state.players[slot].action = null;
                             room.seerReturnSlot = null;
                         }
+                        room.playerHand[slot] = state.players[slot].hand.length;
+                        room.playerHand[room.seerReturnSlot] = state.players[room.seerReturnSlot].hand.length;
                         update();
                         updateState();
                     }
@@ -1035,24 +1042,28 @@ function init(wsServer, path) {
                 "cardinal-sell": (slot, slot_d, cardInd, sellCardInds) => {
                     if (room.phase === 2 && state.players[slot].action === "cardinal-action" && state.players[slot_d] && slot !== slot_d
                         && state.players[slot].hand[cardInd] && sellCardInds && sellCardInds.every
-                        && sellCardInds.every((card) => state.players[slot].cards[card]) && !sellCardInds.includes(cardInd)
-                        && state.players[slot].hand[cardInd].cost - room.playerGold === sellCardInds.length
+                        && sellCardInds.every((card) => state.players[slot].hand[card]) && !sellCardInds.includes(cardInd)
+                        && getBuildCost(slot, state.players[slot].hand[cardInd]) - room.playerGold[slot] === sellCardInds.length
                         && sellCardInds.length <= room.playerGold[slot_d]) {
-                        const wasBuilt = build(slot, cardInd, undefined, true)[0];
+                        const
+                            playerHand = state.players[slot].hand,
+                            cost = getBuildCost(slot, playerHand[cardInd]),
+                            cardsToSell = sellCardInds.map((cardInd) => playerHand[cardInd]),
+                            wasBuilt = build(slot, cardInd, undefined, true)[0];
                         if (wasBuilt) {
-                            wasBuilded(slot, room.playerGold[slot]);
                             room.playerGold[slot] = 0;
                             room.playerGold[slot_d] -= sellCardInds.length;
-                            sellCardInds.forEach((cardInd) => {
-                                state.players[slot_d].hand.push(...state.players[slot].hand.splice(cardInd, 1));
+                            cardsToSell.forEach((cardToSell) => {
+                                state.players[slot_d].hand.push(...playerHand.splice(playerHand.findIndex((card) => cardToSell === card), 1));
                             });
-                            room.playerHand[slot] = state.players[slot].hand.length;
+                            room.playerHand[slot] = playerHand.length;
                             room.playerHand[slot_d] = state.players[slot_d].hand.length;
                             state.players[slot].action = null;
                             countPoints(slot);
                             countPoints(slot_d);
                             sendStateSlot(slot);
                             sendStateSlot(slot_d);
+                            wasBuilded(slot, cost);
                             update();
                         }
                     }
@@ -1245,15 +1256,17 @@ function init(wsServer, path) {
                 },
                 "build-den-of-thieves": (slot, cardIndexes) => {
                     if (room.phase === 2 && slot === room.currentPlayer && includeHand(slot, 'den_of_thieves')
-                        && cardIndexes && cardIndexes.every && cardIndexes.every((cardInd) => state.players[slot].hand[cardInd])) {
-                        const maxCost = 6 - include(slot, "factory");
+                        && cardIndexes && cardIndexes.every && cardIndexes.every((cardInd) => state.players[slot].hand[cardInd] && state.players[slot].hand[cardInd].type !== "den_of_thieves")) {
+                        const
+                            building = state.players[slot].hand.find((card) => card.type === "den_of_thieves"),
+                            maxCost = getBuildCost(slot, building);
                         if (room.playerGold[slot] + cardIndexes.length < maxCost) return;
                         cardIndexes.splice(maxCost);
                         const
                             cardsToDrop = state.players[slot].hand.filter((card, ind) => cardIndexes.includes(ind)),
                             wasBuilt = build(
                                 slot,
-                                state.players[slot].hand.findIndex((card) => card.type === "den_of_thieves"),
+                                state.players[slot].hand.indexOf(building),
                                 undefined,
                                 true);
                         if (wasBuilt[0]) {

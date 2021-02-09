@@ -666,6 +666,7 @@ button {
     font-weight: 400;
     z-index: 1;
     box-shadow: 0 0 6px 1px black;
+    user-select: none;
 }
 
 .action-button {

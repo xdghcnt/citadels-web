@@ -88,7 +88,8 @@ class Card extends React.Component {
             data = this.props.game.state,
             originalCard = this.props.card,
             isToken = this.props.isToken,
-            card = (originalCard === "1_2" && data.witchedstate === 1 && !isToken) ? data.witched : originalCard,
+            isGallery = this.props.isGallery,
+            card = (originalCard === "1_2" && data.witchedstate === 1 && !isToken && !isGallery) ? data.witched : originalCard,
             cardType = card.type,
             getBackgroundImage = (isToken, useOriginalCard) => `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
                 isCharacter
@@ -112,8 +113,8 @@ class Card extends React.Component {
                 "current-character": currentCharacter,
                 "secret-vault": isSecretVault,
                 "decoration": card.decoration,
-                "in-action": !isCharacter && data.userAction === card.type,
-                "witched-state": !isToken && data.witchedstate === 1 && originalCard === data.witched
+                "in-action": !isCharacter && (data.userAction === card.type || (data.buildTarget === this.props.id && this.props.inHand)),
+                "witched-state": !isGallery && !isToken && data.witchedstate === 1 && originalCard === data.witched
             })}
                  style={{"background-image": backgroundImage}}
                  onMouseDown={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
@@ -153,6 +154,7 @@ class PlayerSlot extends React.Component {
             wizardAction = data.player && data.player.action === 'wizard-player-action' && data.phase === 2,
             emperorAction = data.player && ['emperor-action', 'emperor-nores-action'].includes(data.player.action) && data.phase === 2 && data.playerChosen === null,
             abbatAction = data.player && data.player.action === 'abbat-action' && data.phase === 2,
+            cardinalActionPlayer = data.player && data.userAction === 'cardinal-action-player' && data.phase === 2,
             spyAction = data.player && data.player.action === 'spy-action' && data.phase === 2,
             maxMoney = Math.max(...Object.values(data.playerGold)),
             isBigMoney = data.playerGold[slot] === maxMoney && data.playerGold[data.userSlot] !== maxMoney,
@@ -200,6 +202,9 @@ class PlayerSlot extends React.Component {
                             : null}
                         {spyAction && slot != data.userSlot && data.playerHand[slot] ?
                             <button onClick={() => game.handleSpy(slot)}>Посмотреть карты</button>
+                            : null}
+                        {cardinalActionPlayer && slot != data.userSlot && game.isCardinalActionAvailable(data.buildTarget, slot) ?
+                            <button onClick={() => game.handleCardinalActionPlayer(slot)}>Выбрать покупателя</button>
                             : null}
                     </div>
                     {data.playerCharacter[slot] ?
@@ -631,7 +636,7 @@ class CreateGamePanel extends React.Component {
                                                 selected: showAllCards || this.state.charactersSelected.has(card)
                                             })}>
                                             <Card card={card} type="character"
-                                                  game={game}
+                                                  game={game} isGallery={true}
                                                   onClick={() => !galleryMode && this.handleClickCharacter(set + 1, type + 1)}/>
                                         </div>;
                                     }
@@ -793,7 +798,7 @@ class Game extends React.Component {
         this.setState(this.state);
     }
 
-    handleClickHandCard(cardInd) {
+    handleClickHandCard(cardInd, forGold) {
         if (this.state.userAction === "magician")
             this.toggleCardChoose(cardInd);
         else if (this.state.userAction === "framework") {
@@ -808,17 +813,51 @@ class Game extends React.Component {
         } else if (this.state.userAction === "den_of_thieves") {
             if (this.state.player.hand[cardInd].type !== "den_of_thieves")
                 this.toggleCardChoose(cardInd);
+        } else if (this.state.userAction === "cardinal-action-cards") {
+            if (this.state.player.hand[cardInd] !== this.state.buildTarget)
+                this.toggleCardChoose(cardInd);
         } else if (this.state.userAction === "necropolis") {
         } else if (this.state.player.action === "seer-return") {
             this.socket.emit("seer-return", cardInd);
         } else {
             const cardType = this.state.player.hand[cardInd].type;
-            if (cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts > 0)
+            if (!forGold && cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts > 0)
                 this.setUserAction("necropolis");
-            else if (cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts > 0)
+            else if (!forGold && cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts > 0)
                 this.setUserAction("den_of_thieves");
+            else if (this.state.currentCharacter === "5_3" && this.state.buildDistricts && Object.keys(this.state.playerCharacter).some((player) => this.isCardinalActionAvailable(cardInd, player)))
+                this.setUserAction("cardinal-action-player", {buildTarget: cardInd});
             else
                 this.socket.emit('build', cardInd);
+
+        }
+    }
+
+    getBuildCost(cardInd) {
+        const building = this.state.player.hand[cardInd];
+        return building.cost - ((building.kind === 9 && this.state.playerDistricts[this.state.userSlot].find((card) => card.type === "factory")) ? 1 : 0);
+    }
+
+    isCardinalActionAvailable(cardInd, target) {
+        const goldNeeded = this.getBuildCost(cardInd) - this.state.playerGold[this.state.userSlot];
+        if (goldNeeded <= 0)
+            return false;
+        if (goldNeeded > (this.state.player.hand.length - 1))
+            return false;
+        if (goldNeeded > this.state.playerGold[target])
+            return false;
+        return true;
+    }
+
+    handleCardinalActionPlayer(player) {
+        this.setUserAction("cardinal-action-cards", {buildTarget: this.state.buildTarget, playerChosen: player});
+    }
+
+    handleCardinalActionCards() {
+        const goldNeeded = this.getBuildCost(this.state.buildTarget) - this.state.playerGold[this.state.userSlot];
+        if (this.state.cardChosen.length === goldNeeded) {
+            this.socket.emit("cardinal-sell", this.state.playerChosen, this.state.buildTarget, this.state.cardChosen);
+            this.handleStopUserAction();
         }
     }
 
@@ -931,23 +970,25 @@ class Game extends React.Component {
             index = this.state.player.hand.indexOf(this.state.player.hand.filter((card) => card.type === "necropolis")[0]);
         else
             index = this.state.player.hand.indexOf(this.state.player.hand.filter((card) => card.type === "den_of_thieves")[0]);
-        this.socket.emit('build', index);
+        this.handleClickHandCard(index, true);
         this.handleStopUserAction();
     }
 
-    setUserAction(action) {
+    setUserAction(action, params) {
         this.setState(Object.assign(this.state, {
             userAction: action,
             cardChosen: [],
-            playerChosen: null
-        }));
+            playerChosen: null,
+            buildTarget: null,
+        }, params));
     }
 
     handleStopUserAction() {
         this.setState(Object.assign(this.state, {
             userAction: null,
             cardChosen: [],
-            playerChosen: null
+            playerChosen: null,
+            buildTarget: null
         }));
     }
 
@@ -1106,6 +1147,7 @@ class Game extends React.Component {
             abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
             seerAction = data.player && data.player.action === 'seer-action' && data.phase === 2,
             spyUserAction = data.player && data.userAction === 'spy' && data.phase === 2,
+            cardinalActionCards = data.player && data.userAction === 'cardinal-action-cards' && data.phase === 2,
             navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
             theaterAction = data.player && data.player.action === 'theater-action' && data.phase === 1.5,
             necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
@@ -1124,7 +1166,7 @@ class Game extends React.Component {
             const districtCardsMinimized = data.player && data.currentPlayer === data.userSlot && ((data.phase === 1)
                 || data.phase == 3 || data.phase === 2 && (['assassin-action', 'thief-action', 'witch-action', 'blackmailer-action', 'magistrate-action'].includes(data.player.action))
                 && !necropolisAction && !denOfThievesAction);
-            const
+            let
                 userActionText = {
                     magician: "Выберите карты для сброса",
                     arsenal: "Выберите постройку для сноса",
@@ -1134,8 +1176,12 @@ class Game extends React.Component {
                     den_of_thieves: "Вы можете выбрать карты для оплаты",
                     emperor: "Выберите ресурс, за который вы отдадите корону",
                     abbat: "Количество дохода, получаемое картами",
-                    spy: "Выберите вид квартала"
+                    spy: "Выберите вид квартала",
+                    "cardinal-action-player": "Выберите покупателя",
+                    "cardinal-action-cards": "Выберите карты для продажи"
                 }[data.userAction];
+            if (data.userAction === "cardinal-action-cards")
+                userActionText = `${userActionText} (${this.getBuildCost(this.state.buildTarget) - this.state.playerGold[this.state.userSlot]})`;
             let incomeValue = 0;
             if (data.incomeAction && !magistrateOpenAction) {
                 const kindIncome = data.currentCharacter.split('_')[0];
@@ -1213,7 +1259,7 @@ class Game extends React.Component {
                             <div className={cs("hand-section", {noAction: !districtCardsMinimized})}>
                                 <div className={cs('cards-list', {minimized: districtCardsMinimized})}>
                                     {data.player && data.player.hand && data.player.hand.map((card, id) => (
-                                        <Card key={id} card={card} type="card" id={id}
+                                        <Card key={id} card={card} type="card" id={id} inHand={true}
                                               onClick={() => this.handleClickHandCard(id)}
                                               game={this}/>
                                     ))}
@@ -1269,7 +1315,7 @@ class Game extends React.Component {
                                 {data.phase == 2 && data.player.action === "seer-return" ?
                                     <div className="status-text" className="choose-character">
                                         <p className="status-text" className="status-text">Выберите карту, чтобы отдать
-                                            её</p>
+                                            её {data.playerNames[data.playerSlots[data.seerReturnSlot]]}</p>
                                     </div>
                                     : null}
                                 {data.phase == 1.5 ?
@@ -1363,14 +1409,14 @@ class Game extends React.Component {
                                                 ? "Выберите карту"
                                                 : "Просмотр карт"
                                         }</p>
-                                        {data.player.action
+                                        {data.player.action === "spy-cards"
                                             ? <div className="action-button">
                                                 <button onClick={() => this.handleSpyCardsEnd()}>Продолжить</button>
                                             </div>
                                             : ""}
                                         <div className="cards-list">
                                             {data.player && data.player.choose && data.player.choose.map((card, id) => (
-                                                <Card key={id} card={card} type="card" game={this}
+                                                <Card key={id} card={card} type="card" game={this} id={id}
                                                       onClick={() => this.handleTakeCard(id)}/>
                                             ))}
                                         </div>
@@ -1420,6 +1466,9 @@ class Game extends React.Component {
                                             {spyUserAction ?
                                                 <button onClick={() => this.handleSpyChooseDistrict(9)}>Особый
                                                 </button> : null}
+                                            {cardinalActionCards ?
+                                                <button onClick={() => this.handleCardinalActionCards()}>Применить
+                                                </button> : null}
                                         </div>
                                     </div>
                                     : null}
@@ -1457,7 +1506,7 @@ class Game extends React.Component {
                                       className={`material-icons start-game settings-button`}>play_arrow</i>)
                                 : <i onClick={() => this.handleClickStop()}
                                      className="toggle-theme material-icons settings-button">stop</i>) : ""}
-                            {!isHost
+                            {!isHost || data.phase !== 0
                                 ? (<i onClick={() => this.handleClickShowCards()}
                                       className="material-icons settings-button">amp_stories</i>)
                                 : ""}
