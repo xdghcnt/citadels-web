@@ -486,7 +486,7 @@ function init(wsServer, path) {
                 },
                 include = (slot, card) => room.playerDistricts[slot].some(building => building.type === card),
                 getDistrictCost = (card) => card.cost + (card.decoration ? 1 : 0),
-                getBuildCost = (slot, card) => card.cost - ((include(slot, "factory") && card.type === 9) ? 1 : 0),
+                getBuildCost = (slot, card) => card.cost - ((include(slot, "factory") && card.kind === 9) ? 1 : 0),
                 isCharactersValid = (characters) => {
                     if (!([8, 9].includes(characters.length) && characters.every((character, index) => {
                         const match = character.match(/^([1-9])_([1-3])$/);
@@ -670,7 +670,8 @@ function init(wsServer, path) {
                     }
                 },
                 "take-resources": (slot, res) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && !room.tookResource && ~['coins', 'card'].indexOf(res) && state.players[slot].action !== 'magistrate-open') {
+                    if (room.phase === 2 && slot === room.currentPlayer && !room.tookResource && ~['coins', 'card'].indexOf(res)
+                        && !['magistrate-open', 'seer-return'].includes(state.players[slot].action)) {
                         if (res === 'coins') {
                             room.tookResource = true;
                             room.playerGold[slot] += 2;
@@ -903,11 +904,11 @@ function init(wsServer, path) {
                         state.players[slot].action = null;
                         state.players[room.spyTarget].hand = state.players[slot].choose;
                         state.players[slot].choose = null;
-                        room.spyTarget = null;
                         room.phase = 2;
-                        update();
-                        sendStateSlot(slot_d);
+                        sendStateSlot(room.spyTarget);
+                        room.spyTarget = null;
                         sendStateSlot(slot);
+                        update();
                     }
                 },
                 "exchange-hand": (slot, slot_d, cardInds) => {
@@ -985,6 +986,8 @@ function init(wsServer, path) {
                         state.players[room.seerReturnSlot].hand.push(
                             ...state.players[slot].hand.splice(cardInd, 1)
                         );
+                        room.playerHand[slot] = state.players[slot].hand.length;
+                        room.playerHand[room.seerReturnSlot] = state.players[room.seerReturnSlot].hand.length;
                         countPoints(room.seerReturnSlot);
                         room.seerReturnSlot = getNextReturnSeer();
                         if (room.seerReturnSlot === slot)
@@ -993,8 +996,6 @@ function init(wsServer, path) {
                             state.players[slot].action = null;
                             room.seerReturnSlot = null;
                         }
-                        room.playerHand[slot] = state.players[slot].hand.length;
-                        room.playerHand[room.seerReturnSlot] = state.players[room.seerReturnSlot].hand.length;
                         update();
                         updateState();
                     }
@@ -1150,6 +1151,7 @@ function init(wsServer, path) {
                             return sendSlot(slot, "message", `Недостаточно монет (${room.playerGold[slot]}/${cost}).`);
                         state.players[slot].action = null;
                         room.playerGold[slot] -= cost;
+                        room.playerGold[opp] += cost;
                         room.playerDistricts[slot].splice(my_d, 1, opp_building);
                         room.playerDistricts[opp].splice(opp_d, 1, my_building);
                         countPoints(opp);
@@ -1296,7 +1298,13 @@ function init(wsServer, path) {
                 },
                 "end-turn": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.tookResource) {
-                        if (['witch-action', 'magistrate-open', 'blackmailed-response', 'blackmailed-open', 'emperor-action', 'emperor-nores-action'].includes(state.players[slot].action)) return;
+                        if (['witch-action',
+                            'magistrate-open',
+                            'blackmailed-response',
+                            'blackmailed-open',
+                            'emperor-action',
+                            'emperor-nores-action',
+                            'seer-return'].includes(state.players[slot].action)) return;
                         if (room.currentCharacter != "1_2") {
                             if (!room.playerGold[slot] && include(slot, "poor_house"))
                                 room.playerGold[slot] += 1;

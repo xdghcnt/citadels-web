@@ -835,7 +835,7 @@ class Game extends React.Component {
 
     getBuildCost(cardInd) {
         const building = this.state.player.hand[cardInd];
-        return building.cost - ((building.kind === 9 && this.state.playerDistricts[this.state.userSlot].find((card) => card.type === "factory")) ? 1 : 0);
+        return building.cost - ((building.kind === 9 && this.state.playerDistricts[this.state.userSlot].find((card) => card.kind === "factory")) ? 1 : 0);
     }
 
     isCardinalActionAvailable(cardInd, target) {
@@ -1146,6 +1146,7 @@ class Game extends React.Component {
             emperorAction = data.player && data.userAction === 'emperor' && data.phase === 2,
             abbatIncome = data.player && data.userAction === 'abbat' && data.phase === 2,
             seerAction = data.player && data.player.action === 'seer-action' && data.phase === 2,
+            seerReturnAction = data.player && data.player.action === 'seer-return' && data.phase === 2,
             spyUserAction = data.player && data.userAction === 'spy' && data.phase === 2,
             cardinalActionCards = data.player && data.userAction === 'cardinal-action-cards' && data.phase === 2,
             navigatorAction = data.player && data.player.action === 'navigator-action' && data.phase === 2,
@@ -1330,14 +1331,14 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && !data.userAction ?
                                     <div className="action-button">
-                                        {!data.tookResource && !magistrateOpenAction ?
+                                        {!data.tookResource && !magistrateOpenAction && !seerReturnAction ?
                                             <button onClick={() => this.handleTakeResource('coins')}>Получить 2
                                                 монеты</button> : null}
-                                        {!data.tookResource && !magistrateOpenAction ?
+                                        {!data.tookResource && !magistrateOpenAction && !seerReturnAction ?
                                             <span className="button-or">
                                                 или
                                             </span> : null}
-                                        {!data.tookResource && !magistrateOpenAction ?
+                                        {!data.tookResource && !magistrateOpenAction && !seerReturnAction ?
                                             <button onClick={() => this.handleTakeResource('card')}>Взять
                                                 карту</button> : null}
                                         {magicianAction ?
@@ -1397,7 +1398,8 @@ class Game extends React.Component {
                                         {incomeValue ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
                                                 доход ({incomeValue})</button> : null}
-                                        {data.tookResource && !magistrateOpenAction && !blackmailedResponseAction && !blackmailedOpenAction && !emperorAction && !emperor ?
+                                        {data.tookResource && !magistrateOpenAction && !blackmailedResponseAction
+                                        && !blackmailedOpenAction && !emperorAction && !emperor && !seerReturnAction ?
                                             <button onClick={() => this.handleEndTurn()}>Конец хода</button> : null}
                                     </div>
                                     : null}
