@@ -1250,7 +1250,7 @@ function init(wsServer, path) {
                 },
                 "build-necropolis": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && includeHand(slot, 'necropolis')
-                        && state.players[slot].hand[cardInd]) {
+                        && room.playerDistricts[slot][cardInd]) {
                         const wasBuilt = build(slot,
                             state.players[slot].hand.findIndex((card) => card.type === "necropolis"),
                             cardInd,
