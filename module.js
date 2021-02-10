@@ -970,9 +970,6 @@ function init(wsServer, path) {
                 "seer-action": (slot) => {
                     if (room.phase === 2 && state.players[slot].action === 'seer-action') {
                         state.players[slot].action = 'seer-return';
-                        room.seerReturnSlot = +Object.keys(state.players)[0];
-                        if (room.seerReturnSlot === slot)
-                            room.seerReturnSlot = getNextReturnSeer();
                         room.seerReturnPlayers = [];
                         Object.keys(state.players).forEach((playerInd) => {
                             if (state.players[playerInd].hand.length && playerInd != slot) {
@@ -984,6 +981,7 @@ function init(wsServer, path) {
                                 room.seerReturnPlayers.push(playerInd);
                             }
                         });
+                        room.seerReturnSlot = room.seerReturnPlayers[0];
                         room.playerHand[slot] = state.players[slot].hand.length;
                         update();
                         updateState();
@@ -1001,6 +999,7 @@ function init(wsServer, path) {
                         if (!state.players[room.seerReturnSlot]) {
                             state.players[slot].action = null;
                             room.seerReturnSlot = null;
+                            room.seerReturnPlayers = null;
                         }
                         update();
                         updateState();
