@@ -1189,6 +1189,7 @@ class Game extends React.Component {
                 incomeValue = data.playerDistricts[data.userSlot] ? data.playerDistricts[data.userSlot].filter(card => card.kind === Number(kindIncome)).length
                     + data.playerDistricts[data.userSlot].some(card => card.type === "school_of_magic") : 0;
             }
+            const canTakeResource = !data.tookResource && !magistrateOpenAction && !seerReturnAction;
             return (
                 <div
                     className={cs(`game`, {
@@ -1331,14 +1332,14 @@ class Game extends React.Component {
                                     : null}
                                 {data.phase == 2 && !data.userAction ?
                                     <div className="action-button">
-                                        {!data.tookResource && !magistrateOpenAction && !seerReturnAction ?
+                                        {canTakeResource ?
                                             <button onClick={() => this.handleTakeResource('coins')}>Получить 2
                                                 монеты</button> : null}
-                                        {!data.tookResource && !magistrateOpenAction && !seerReturnAction ?
+                                        {canTakeResource ?
                                             <span className="button-or">
                                                 или
                                             </span> : null}
-                                        {!data.tookResource && !magistrateOpenAction && !seerReturnAction ?
+                                        {canTakeResource ?
                                             <button onClick={() => this.handleTakeResource('card')}>Взять
                                                 карту</button> : null}
                                         {magicianAction ?
