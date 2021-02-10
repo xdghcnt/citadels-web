@@ -61,12 +61,12 @@ const shuffle = array => {
     return array
 };
 
-const createDeck = (players, districtsFilter) => {
+const createDeck = (players, districtsFilter, onlyFilter) => {
     const deck = Array();
     let deck9 = Array();
     for (let key in districts) {
         for (let i = 0; i < districts[key].quantity; i++)
-            if (districts[key].type !== 9 || districtsFilter.includes(key))
+            if ((districts[key].type !== 9 && !onlyFilter) || districtsFilter.includes(key))
                 (districts[key].type === 9 ? deck9 : deck).push({
                     type: key,
                     cost: districts[key].cost,

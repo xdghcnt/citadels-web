@@ -112,6 +112,8 @@ function init(wsServer, path) {
                                 state.players[slot] = {
                                     hand: state.districtDeck.splice(0, 4)
                                 };
+                                if (testMode && slot === 0)
+                                    state.players[slot].hand.push(...utils.createDeck(state.playersCount, ["necropolis"], true))
                                 room.playerGold[slot] = (slot === 0 && testMode) ? 99 : 2;
                                 room.playerHand[slot] = 4;
                                 room.playerDistricts[slot] = [];
@@ -1217,8 +1219,8 @@ function init(wsServer, path) {
                 "framework-action": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'framework')
                         && state.players[slot].hand[cardInd]) {
-                        build(slot, cardInd, getPlayerDistrictIndex(slot, "framework"), true)
-                        tax(slot);
+                        const wasBuilt = build(slot, cardInd, getPlayerDistrictIndex(slot, "framework"), true)
+                        if (wasBuilt[0]) tax(slot);
                     }
                 },
                 "museum-action": (slot, cardInd) => {
