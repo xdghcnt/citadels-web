@@ -799,6 +799,8 @@ class Game extends React.Component {
     }
 
     handleClickHandCard(cardInd, forGold) {
+        if (this.state.userAction === "cardinal-action-player")
+            return;
         if (this.state.userAction === "magician")
             this.toggleCardChoose(cardInd);
         else if (this.state.userAction === "framework") {

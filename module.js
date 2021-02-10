@@ -596,7 +596,7 @@ function init(wsServer, path) {
                 },
                 dropCardHand = (slot, cardInd) => state.districtDeck.push(...state.players[slot].hand.splice(cardInd, 1)),
                 dropCardDistricts = (slot, cardInd) => state.districtDeck.push(...room.playerDistricts[slot].splice(cardInd, 1)),
-                getNextReturnSeer = () => +Object.keys(state.players)["" + (Object.keys(state.players).indexOf(room.seerReturnSlot + "") + 1)],
+                getNextReturnSeer = () => +(room.seerReturnPlayers)["" + (room.seerReturnPlayers.indexOf(room.seerReturnSlot + "") + 1)],
                 removePlayer = (playerId) => {
                     if (room.spectators.has(playerId)) {
                         this.emit("user-kicked", playerId);
@@ -895,6 +895,7 @@ function init(wsServer, path) {
                         room.playerGold[slot] += goldTaken;
                         room.playerHand[slot] += spyedCardsCount;
                         state.players[slot].hand.push(...state.districtDeck.splice(0, spyedCardsCount));
+                        room.playerHand[slot_d] = state.players[slot_d].hand.length;
                         room.phase = 3;
                         update();
                         sendStateSlot(slot_d);
@@ -908,6 +909,7 @@ function init(wsServer, path) {
                         state.players[slot].choose = null;
                         room.phase = 2;
                         sendStateSlot(room.spyTarget);
+                        room.playerHand[room.spyTarget] = state.players[room.spyTarget].hand.length;
                         room.spyTarget = null;
                         sendStateSlot(slot);
                         update();
@@ -971,12 +973,16 @@ function init(wsServer, path) {
                         room.seerReturnSlot = +Object.keys(state.players)[0];
                         if (room.seerReturnSlot === slot)
                             room.seerReturnSlot = getNextReturnSeer();
+                        room.seerReturnPlayers = [];
                         Object.keys(state.players).forEach((playerInd) => {
-                            state.players[slot].hand.push(...state.players[playerInd].hand.splice(
-                                Math.floor(Math.random() * state.players[playerInd].hand.length), 1
-                                )
-                            );
-                            room.playerHand[playerInd] = state.players[playerInd].hand.length;
+                            if (state.players[playerInd].hand.length && playerInd != slot) {
+                                state.players[slot].hand.push(...state.players[playerInd].hand.splice(
+                                    Math.floor(Math.random() * state.players[playerInd].hand.length), 1
+                                    )
+                                );
+                                room.playerHand[playerInd] = state.players[playerInd].hand.length;
+                                room.seerReturnPlayers.push(playerInd);
+                            }
                         });
                         room.playerHand[slot] = state.players[slot].hand.length;
                         update();
@@ -992,8 +998,6 @@ function init(wsServer, path) {
                         room.playerHand[room.seerReturnSlot] = state.players[room.seerReturnSlot].hand.length;
                         countPoints(room.seerReturnSlot);
                         room.seerReturnSlot = getNextReturnSeer();
-                        if (room.seerReturnSlot === slot)
-                            room.seerReturnSlot = getNextReturnSeer();
                         if (!state.players[room.seerReturnSlot]) {
                             state.players[slot].action = null;
                             room.seerReturnSlot = null;
