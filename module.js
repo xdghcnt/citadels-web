@@ -698,7 +698,9 @@ function init(wsServer, path) {
                     }
                 },
                 "take-card": (slot, cardInd) => {
-                    if (room.phase === 3 && slot === room.currentPlayer && ~state.players[slot].choose[cardInd] && !['magistrate-open', 'wizard-card-action', 'scholar-response'].includes(state.players[slot].action)) {
+                    if (room.phase === 3 && slot === room.currentPlayer
+                        && ~state.players[slot].choose[cardInd]
+                        && !['magistrate-open', 'wizard-card-action', 'scholar-response', 'spy-cards'].includes(state.players[slot].action)) {
                         state.players[slot].hand.push(...state.players[slot].choose.splice(cardInd, 1));
                         state.districtDeck.push(...state.players[slot].choose.splice(0));
                         room.playerHand[slot] += 1;
