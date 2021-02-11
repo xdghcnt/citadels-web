@@ -386,7 +386,7 @@ class CreateGamePanel extends React.Component {
                     "quarry",
                     "secret_vault",
                     "forgery",
-                    "theatre"
+                    "theater"
                 ]
             },
             emissary: {
@@ -446,7 +446,7 @@ class CreateGamePanel extends React.Component {
                     "secret_vault",
                     "forgery",
                     "stable",
-                    "theatre",
+                    "theater",
                     "den_of_thieves",
                     "well_of_wishes"
                 ]
