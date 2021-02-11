@@ -112,10 +112,12 @@ function init(wsServer, path) {
                                 state.players[slot] = {
                                     hand: state.districtDeck.splice(0, 4)
                                 };
-                                if (testMode && slot === 0)
-                                    state.players[slot].hand.push(...utils.createDeck(state.playersCount, ["necropolis"], true))
-                                room.playerGold[slot] = (slot === 0 && testMode) ? 99 : 2;
                                 room.playerHand[slot] = 4;
+                                if (testMode && slot === 0) {
+                                    state.players[slot].hand = [];
+                                    room.playerHand[slot] = 0;
+                                }
+                                room.playerGold[slot] = (slot === 0 && testMode) ? 99 : 2;
                                 room.playerDistricts[slot] = [];
                                 room.playerCharacter[slot] = [];
                                 room.playerScore[slot] = 0;
@@ -596,7 +598,7 @@ function init(wsServer, path) {
                 },
                 dropCardHand = (slot, cardInd) => state.districtDeck.push(...state.players[slot].hand.splice(cardInd, 1)),
                 dropCardDistricts = (slot, cardInd) => state.districtDeck.push(...room.playerDistricts[slot].splice(cardInd, 1)),
-                getNextReturnSeer = () => +(room.seerReturnPlayers)["" + (room.seerReturnPlayers.indexOf(room.seerReturnSlot + "") + 1)],
+                getNextReturnSeer = () => room.seerReturnPlayers[room.seerReturnPlayers.indexOf(room.seerReturnSlot) + 1],
                 removePlayer = (playerId) => {
                     if (room.spectators.has(playerId)) {
                         this.emit("user-kicked", playerId);
@@ -980,7 +982,7 @@ function init(wsServer, path) {
                                     )
                                 );
                                 room.playerHand[playerInd] = state.players[playerInd].hand.length;
-                                room.seerReturnPlayers.push(playerInd);
+                                room.seerReturnPlayers.push(+playerInd);
                             }
                         });
                         room.seerReturnSlot = room.seerReturnPlayers[0];
