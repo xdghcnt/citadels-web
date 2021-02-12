@@ -1216,7 +1216,7 @@ class Game extends React.Component {
                                         discard: ~data.characterFace.indexOf(card),
                                     })}>
                                         <div className={cs("status", {
-                                            "two-icons": magistrated && (robbed || blackmailed),
+                                            "two-icons": (magistrated || trueMagistrated) && (robbed || blackmailed || trueBlackmailed),
                                             magistrated, blackmailed, robbed, assassined, witched
                                         })}>
                                             {assassined ?
