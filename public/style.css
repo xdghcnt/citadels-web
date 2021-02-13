@@ -729,7 +729,10 @@ button {
     filter: brightness(0.9) grayscale(1);
 }
 
-.status.blackmailed + .character {
+.status.blackmailed + .character,
+.status.magistrated + .character,
+.status.true-blackmailed + .character,
+.status.true-magistrated + .character {
     filter: brightness(0.9) grayscale(0.5);
 }
 
@@ -1353,5 +1356,9 @@ button.inactive {
 }
 
 .player-slot.seer-return {
+    box-shadow: 0 0 6px 3px #346bf0;
+}
+
+.player-slot.target {
     box-shadow: 0 0 6px 3px #346bf0;
 }

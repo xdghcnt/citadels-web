@@ -29,6 +29,7 @@ function init(wsServer, path) {
                 teamsLocked: false,
                 phase: 0,
                 currentPlayer: null,
+                targetSlot: null,
                 currentCharacter: 0,
                 testMode,
                 playerGold: {},
@@ -98,6 +99,7 @@ function init(wsServer, path) {
                 startGame = (districts) => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
                     if (state.playersCount > 1) {
+                        room.targetSlot = null;
                         room.playerGold = {};
                         room.playerHand = {};
                         room.playerDistricts = {};
@@ -114,7 +116,9 @@ function init(wsServer, path) {
                                 };
                                 room.playerHand[slot] = 4;
                                 if (testMode && slot === 0) {
-                                    state.players[slot].hand = [];
+                                    state.players[slot].hand.push(
+                                        ...utils.createDeck(state.playersCount, ["museum"], true)
+                                    );
                                     room.playerHand[slot] = 0;
                                 }
                                 room.playerGold[slot] = (slot === 0 && testMode) ? 99 : 2;
@@ -409,6 +413,7 @@ function init(wsServer, path) {
                     }
                     room.currentCharacter = "0";
                     room.incomeAction = false;
+                    room.targetSlot = null;
                     if (room.assassined === "4_1" && state.characterRoles["4_1"] !== undefined)
                         room.king = state.characterRoles["4_1"];
                     if (room.assassined === "4_3" && state.characterRoles["4_3"] !== undefined)
@@ -426,6 +431,7 @@ function init(wsServer, path) {
                 },
                 endGame = () => {
                     room.currentPlayer = null;
+                    room.targetSlot = null;
                     Object.keys(state.players).forEach(slot => {
                         countPoints(Number(slot));
                         if (includeHand(slot, "secret_vault")) {
@@ -568,6 +574,7 @@ function init(wsServer, path) {
                         countPoints(slot);
                         sendStateSlot(slot);
                         room.currentPlayer = magistate;
+                        room.targetSlot = slot;
                         state.players[room.currentPlayer].action = 'magistrate-open';
                         sendStateSlot(room.currentPlayer);
                         update();
@@ -599,7 +606,7 @@ function init(wsServer, path) {
                 dropCardHand = (slot, cardInd) => state.districtDeck.push(...state.players[slot].hand.splice(cardInd, 1)),
                 dropCardDistricts = (slot, cardInd) => state.districtDeck.push(...room.playerDistricts[slot].splice(cardInd, 1)),
                 getNextReturnSeer = () => room.seerReturnPlayers[room.seerReturnPlayers.indexOf(room.seerReturnSlot) + 1],
-                removePlayer = (playerId) => {
+                isNoMagistrateAction = () => state.players[room.currentPlayer].action !== 'magistrate-open',                removePlayer = (playerId) => {
                     if (room.spectators.has(playerId)) {
                         this.emit("user-kicked", playerId);
                         room.spectators.delete(playerId);
@@ -810,6 +817,7 @@ function init(wsServer, path) {
                         sendStateSlot(room.currentPlayer);
                         room.currentPlayer = magistratedSlot;
                         state.firstBuilding = true;
+                        room.targetSlot = null;
                         tax(payingSlot);
                     }
                 },
@@ -848,6 +856,7 @@ function init(wsServer, path) {
                             countPoints(thiefSlot);
                             startTurn();
                         } else {
+                            room.targetSlot = slot;
                             room.currentPlayer = thiefSlot;
                             state.players[thiefSlot].action = 'blackmailed-open';
                             sendStateSlot(slot);
@@ -874,6 +883,7 @@ function init(wsServer, path) {
                         } else {
                             room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
                         }
+                        room.targetSlot = null;
                         sendStateSlot(blackmailedSlot);
                         sendStateSlot(room.currentPlayer);
                         room.currentPlayer = blackmailedSlot;
@@ -901,6 +911,7 @@ function init(wsServer, path) {
                         state.players[slot].hand.push(...state.districtDeck.splice(0, spyedCardsCount));
                         room.playerHand[slot_d] = state.players[slot_d].hand.length;
                         room.phase = 3;
+                        room.targetSlot = slot_d;
                         update();
                         sendStateSlot(slot_d);
                         sendStateSlot(slot);
@@ -915,6 +926,7 @@ function init(wsServer, path) {
                         sendStateSlot(room.spyTarget);
                         room.playerHand[room.spyTarget] = state.players[room.spyTarget].hand.length;
                         room.spyTarget = null;
+                        room.targetSlot = null;
                         sendStateSlot(slot);
                         update();
                     }
@@ -949,6 +961,7 @@ function init(wsServer, path) {
                         state.wizardPlayer = slot_d;
                         state.players[slot].action = 'wizard-card-action';
                         state.players[slot].choose = state.players[slot_d].hand;
+                        room.targetSlot = slot_d;
                         sendStateSlot(slot);
                         update();
                     }
@@ -967,6 +980,7 @@ function init(wsServer, path) {
                         sendStateSlot(slot);
                         sendStateSlot(state.wizardPlayer);
                         state.wizardPlayer = null;
+                        room.targetSlot = null;
                         state.players[slot].action = null;
                         update();
                     }
@@ -1201,7 +1215,8 @@ function init(wsServer, path) {
                     }
                 },
                 "arsenal-destroy": (slot, slot_d, cardInd) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'arsenal') && room.playerDistricts[slot_d][cardInd]) {
+                    if (room.phase === 2 && slot === room.currentPlayer && isNoMagistrateAction()
+                        && include(slot, 'arsenal') && room.playerDistricts[slot_d][cardInd]) {
                         if (getDistrictsCount(slot_d) >= state.maxDistricts)
                             return sendSlot(slot, "message", 'Вы не можете использовать Арсенал на законченном городе');
                         destroy(slot_d, cardInd);
@@ -1213,7 +1228,8 @@ function init(wsServer, path) {
                     }
                 },
                 "forgery-action": (slot) => {
-                    if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'forgery') && room.forgeryAction && room.playerGold[slot] > 1) {
+                    if (room.phase === 2 && slot === room.currentPlayer && isNoMagistrateAction()
+                        && include(slot, 'forgery') && room.forgeryAction && room.playerGold[slot] > 1) {
                         state.players[slot].hand.push(...state.districtDeck.splice(0, 3));
                         room.playerGold[slot] -= 2;
                         room.playerHand[slot] = state.players[slot].hand.length;
@@ -1225,14 +1241,14 @@ function init(wsServer, path) {
                 },
                 "framework-action": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'framework')
-                        && state.players[slot].hand[cardInd]) {
+                        && state.players[slot].hand[cardInd] && isNoMagistrateAction()) {
                         const wasBuilt = build(slot, cardInd, getPlayerDistrictIndex(slot, "framework"), true)
                         if (wasBuilt[0]) tax(slot);
                     }
                 },
                 "museum-action": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'museum')
-                        && room.museumAction && state.players[slot].hand[cardInd]) {
+                        && room.museumAction && state.players[slot].hand[cardInd] && isNoMagistrateAction()) {
                         const museum = getPlayerDistrict(slot, "museum");
                         museum.exposition = museum.exposition || [];
                         museum.exposition.push(...state.players[slot].hand.splice(cardInd, 1));
@@ -1245,7 +1261,7 @@ function init(wsServer, path) {
                 },
                 "laboratory-action": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'laboratory')
-                        && room.laboratoryAction && state.players[slot].hand[cardInd]) {
+                        && room.laboratoryAction && state.players[slot].hand[cardInd] && isNoMagistrateAction()) {
                         dropCardHand(slot, cardInd);
                         room.playerHand[slot]--;
                         room.playerGold[slot] += 2;

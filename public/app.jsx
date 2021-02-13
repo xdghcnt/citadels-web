@@ -168,7 +168,8 @@ class PlayerSlot extends React.Component {
                 "winner": isWinner,
                 "player-chosen": playerChosen,
                 "hasCrown": data.king === slot,
-                "seer-return": slot === data.seerReturnSlot
+                "seer-return": slot === data.seerReturnSlot,
+                "target": slot === data.targetSlot
             })}>
                 <div className="profile">
                     <div className="profile-bg"/>
@@ -1384,19 +1385,24 @@ class Game extends React.Component {
                                         {this.state.player.action === 'scholar-action' ?
                                             <button onClick={() => this.handleScholar()}>Раскопать
                                                 карту</button> : null}
-                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0) ?
+                                        {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0)
+                                        && !magistrateOpenAction ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}
-                                        {(this.hasDistricts('museum') && data.player.hand.length && data.museumAction) ?
+                                        {(this.hasDistricts('museum') && data.player.hand.length && data.museumAction)
+                                        && !magistrateOpenAction ?
                                             <button onClick={() => this.setUserAction("museum")}>Исп.
                                                 Музей</button> : null}
-                                        {(this.hasDistricts('laboratory') && data.player.hand.length && data.laboratoryAction) ?
+                                        {(this.hasDistricts('laboratory') && data.player.hand.length && data.laboratoryAction)
+                                        && !magistrateOpenAction ?
                                             <button onClick={() => this.setUserAction("laboratory")}>Исп.
                                                 Лабораторию</button> : null}
-                                        {this.hasDistricts('arsenal') ?
+                                        {this.hasDistricts('arsenal')
+                                        && !magistrateOpenAction ?
                                             <button onClick={() => this.setUserAction("arsenal")}>Исп.
                                                 Арсенал</button> : null}
-                                        {this.hasDistricts('forgery') && data.playerGold[data.userSlot] > 1 && data.forgeryAction ?
+                                        {this.hasDistricts('forgery') && data.playerGold[data.userSlot] > 1 && data.forgeryAction
+                                        && !magistrateOpenAction ?
                                             <button onClick={() => this.handleForgery()}>Исп. Кузницу</button> : null}
                                         {incomeValue ?
                                             <button onClick={() => this.handleTakeIncome()}>Получить
