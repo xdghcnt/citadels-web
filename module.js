@@ -39,7 +39,7 @@ function init(wsServer, path) {
                 playerScore: {}
             };
             if (testMode)
-                [1, 2, 3, 4].forEach((_, ind) => {
+                [1, 2, 3, 4, 5, 6, 7].forEach((_, ind) => {
                     room.playerSlots[ind] = `kek${ind}`;
                     room.playerNames[`kek${ind}`] = `kek${ind}`;
                 });
@@ -191,8 +191,8 @@ function init(wsServer, path) {
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else if (state.playersCount + 1 === room.characterInGame.length && state.discarded) {
-                        state.characterDeck.push(state.discarded);
-                        state.characterDeck.sort((a, b) => a - b);
+                        state.characterDeck.push(...state.discarded);
+                        state.characterDeck.sort((a, b) => room.characterInGame.indexOf(a) - room.characterInGame.indexOf(b));
                         state.discarded = null;
                         room.currentPlayer = getNextPlayer();
                         state.players[room.currentPlayer].action = 'choose';
