@@ -36,15 +36,23 @@ function init(wsServer, path) {
                 playerHand: {},
                 playerDistricts: {},
                 playerCharacter: {},
-                playerScore: {}
+                playerScore: {},
+                characterTime: testMode ? 2 : 12,
+                actionTime: testMode ? 3 :45,
+                smallActionTime: testMode ? 2 : 7,
+                time: null,
+                timeTotal: null,
+                timed: true,
+                paused: true
             };
             if (testMode)
-                [1, 2, 3, 4, 5, 6, 7].forEach((_, ind) => {
+                [1, 2, 3, 4].forEach((_, ind) => {
                     room.playerSlots[ind] = `kek${ind}`;
                     room.playerNames[`kek${ind}`] = `kek${ind}`;
                 });
             this.room = room;
             this.lastInteraction = new Date();
+            let timerInterval;
             const state = {
                 players: {},
                 districtDeck: [],
@@ -99,6 +107,7 @@ function init(wsServer, path) {
                 startGame = (districts) => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
                     if (state.playersCount > 1) {
+                        room.paused = false;
                         room.targetSlot = null;
                         room.playerGold = {};
                         room.playerHand = {};
@@ -172,6 +181,7 @@ function init(wsServer, path) {
                     room.currentPlayer = room.king;
                     state.players[room.currentPlayer].action = 'choose';
                     state.players[room.currentPlayer].choose = state.characterDeck;
+                    startTimer();
                     update();
                     updateState();
                 },
@@ -188,6 +198,7 @@ function init(wsServer, path) {
                         room.currentPlayer = getNextPlayer();
                         state.players[room.currentPlayer].action = 'choose';
                         state.players[room.currentPlayer].choose = state.characterDeck;
+                        startTimer();
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else if (state.playersCount + 1 === room.characterInGame.length && state.discarded) {
@@ -197,6 +208,7 @@ function init(wsServer, path) {
                         room.currentPlayer = getNextPlayer();
                         state.players[room.currentPlayer].action = 'choose';
                         state.players[room.currentPlayer].choose = state.characterDeck;
+                        startTimer();
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else {
@@ -259,6 +271,7 @@ function init(wsServer, path) {
                     room.incomeAction = false;
                     state.firstBuilding = false;
                     if (["4_1", "4_3"].includes(room.currentCharacter)) room.king = room.currentPlayer;
+                    startTimer();
                     if (waitToResponse()) {
                         update();
                         sendStateSlot(room.currentPlayer);
@@ -451,6 +464,8 @@ function init(wsServer, path) {
                             }
                     }
                     room.phase = 0;
+                    room.paused = true;
+                    clearInterval(timerInterval);
 
                     room.presetSelected = null;
                     update();
@@ -606,7 +621,8 @@ function init(wsServer, path) {
                 dropCardHand = (slot, cardInd) => state.districtDeck.push(...state.players[slot].hand.splice(cardInd, 1)),
                 dropCardDistricts = (slot, cardInd) => state.districtDeck.push(...room.playerDistricts[slot].splice(cardInd, 1)),
                 getNextReturnSeer = () => room.seerReturnPlayers[room.seerReturnPlayers.indexOf(room.seerReturnSlot) + 1],
-                isNoMagistrateAction = () => state.players[room.currentPlayer].action !== 'magistrate-open',                removePlayer = (playerId) => {
+                isNoMagistrateAction = () => state.players[room.currentPlayer].action !== 'magistrate-open',
+                removePlayer = (playerId) => {
                     if (room.spectators.has(playerId)) {
                         this.emit("user-kicked", playerId);
                         room.spectators.delete(playerId);
@@ -618,6 +634,95 @@ function init(wsServer, path) {
                         }
                     }
                 },
+                startTimer = () => {
+                    if (room.timed) {
+                        if (room.phase === 1)
+                            room.time = room.timeTotal = room.characterTime * 1000;
+                        else if (room.phase === 2)
+                            room.time = room.timeTotal = room.actionTime * 1000;
+                        else if (room.phase === 1.5)
+                            room.time = room.timeTotal = room.smallActionTime * 1000;
+                        let time = new Date();
+                        clearInterval(timerInterval);
+                        timerInterval = setInterval(() => {
+                            if (!room.paused) {
+                                room.time -= new Date() - time;
+                                time = new Date();
+                                if (room.time <= 0) {
+                                    if (room.phase === 1)
+                                        takeCharacter();
+                                    else if (room.phase === 2) {
+                                        takeResources();
+                                        endTurn();
+                                    }
+                                }
+                            } else time = new Date();
+                        }, 100);
+                    }
+                },
+                takeCharacter = (slot, value) => {
+                    slot = room.currentPlayer;
+                    let role = state.characterDeck.splice(
+                        value === undefined ? getRandomTo(state.characterDeck.length) : value, 1)[0];
+                    state.players[slot].character.push(role);
+                    room.playerCharacter[slot].push(0);
+                    state.characterRoles[role] = slot;
+                    state.playersCount == 2 ? nextChoose2() : nextChoose();
+                },
+                takeResources = (slot, res) => {
+                    slot = room.currentPlayer;
+                    res = res || "coins";
+                    if (!room.tookResource) {
+                        if (res === 'coins') {
+                            room.tookResource = true;
+                            room.playerGold[slot] += 2;
+                            if (include(slot, "gold_mine"))
+                                room.playerGold[slot] += 1;
+                            if (waitToResponse()) return moveToResponse();
+                        } else {
+                            if (!state.districtDeck.length) return;
+                            room.tookResource = true;
+                            const cardsToTake = state.districtDeck.splice(0, 2 + include(slot, "observatory"));
+                            if (include(slot, "library")) {
+                                state.players[slot].hand.push(...cardsToTake);
+                                room.playerHand[slot] += cardsToTake.length;
+                            } else {
+                                state.players[slot].choose = cardsToTake;
+                                room.phase = 3;
+                            }
+                        }
+                        countPoints(slot);
+                        update();
+                        sendStateSlot(slot);
+                    }
+                },
+                endTurn = () => {
+                    const slot = room.currentPlayer;
+                    if (['witch-action',
+                        'magistrate-open',
+                        'blackmailed-response',
+                        'blackmailed-open',
+                        'emperor-action',
+                        'emperor-nores-action',
+                        'seer-return'].includes(state.players[slot].action)) return;
+                    if (room.currentCharacter != "1_2") {
+                        if (!room.playerGold[slot] && include(slot, "poor_house"))
+                            room.playerGold[slot] += 1;
+                        if (!state.players[slot].hand.length && include(slot, "park")) {
+                            state.players[slot].hand.push(...state.districtDeck.splice(0, 2));
+                            room.playerHand[slot] += 2;
+                        }
+                        if (room.currentCharacter === "6_2")
+                            room.playerGold[slot] += state.alchemistCoins;
+                    }
+                    state.players[slot].hand.forEach((card, i) => delete card.wizard);
+                    state.players[slot].action = null;
+                    state.players[slot].artistAction = undefined;
+                    countPoints(slot);
+                    sendStateSlot(slot);
+                    nextCharacter();
+                },
+                getRandomTo = (number) => Math.ceil(Math.random() * number),
                 userJoin = (data) => {
                     const user = data.userId;
                     if (!room.playerNames[user])
@@ -653,11 +758,7 @@ function init(wsServer, path) {
             this.slotEventHandlers = {
                 "take-character": (slot, value) => {
                     if (room.phase === 1 && slot === room.currentPlayer && state.players[slot].action === 'choose' && ~state.characterDeck[value]) {
-                        let role = state.characterDeck.splice(value, 1)[0];
-                        state.players[slot].character.push(role);
-                        room.playerCharacter[slot].push(0);
-                        state.characterRoles[role] = slot;
-                        state.playersCount == 2 ? nextChoose2() : nextChoose();
+                        takeCharacter(slot, value);
                     }
                 },
                 "discard-character": (slot, value) => {
@@ -683,27 +784,7 @@ function init(wsServer, path) {
                 "take-resources": (slot, res) => {
                     if (room.phase === 2 && slot === room.currentPlayer && !room.tookResource && ~['coins', 'card'].indexOf(res)
                         && !['magistrate-open', 'seer-return'].includes(state.players[slot].action)) {
-                        if (res === 'coins') {
-                            room.tookResource = true;
-                            room.playerGold[slot] += 2;
-                            if (include(slot, "gold_mine"))
-                                room.playerGold[slot] += 1;
-                            if (waitToResponse()) return moveToResponse();
-                        } else {
-                            if (!state.districtDeck.length) return;
-                            room.tookResource = true;
-                            const cardsToTake = state.districtDeck.splice(0, 2 + include(slot, "observatory"));
-                            if (include(slot, "library")) {
-                                state.players[slot].hand.push(...cardsToTake);
-                                room.playerHand[slot] += cardsToTake.length;
-                            } else {
-                                state.players[slot].choose = cardsToTake;
-                                room.phase = 3;
-                            }
-                        }
-                        countPoints(slot);
-                        update();
-                        sendStateSlot(slot);
+                        takeResources(slot, res);
                     }
                 },
                 "take-card": (slot, cardInd) => {
@@ -1323,29 +1404,7 @@ function init(wsServer, path) {
                 },
                 "end-turn": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.tookResource) {
-                        if (['witch-action',
-                            'magistrate-open',
-                            'blackmailed-response',
-                            'blackmailed-open',
-                            'emperor-action',
-                            'emperor-nores-action',
-                            'seer-return'].includes(state.players[slot].action)) return;
-                        if (room.currentCharacter != "1_2") {
-                            if (!room.playerGold[slot] && include(slot, "poor_house"))
-                                room.playerGold[slot] += 1;
-                            if (!state.players[slot].hand.length && include(slot, "park")) {
-                                state.players[slot].hand.push(...state.districtDeck.splice(0, 2));
-                                room.playerHand[slot] += 2;
-                            }
-                            if (room.currentCharacter === "6_2")
-                                room.playerGold[slot] += state.alchemistCoins;
-                        }
-                        state.players[slot].hand.forEach((card, i) => delete card.wizard);
-                        state.players[slot].action = null;
-                        state.players[slot].artistAction = undefined;
-                        countPoints(slot);
-                        sendStateSlot(slot);
-                        nextCharacter();
+                        endTurn();
                     }
                 }
             };
@@ -1403,7 +1462,34 @@ function init(wsServer, path) {
                     if (value)
                         room.playerNames[user] = value.substr && value.substr(0, 60);
                     update();
-                }
+                },
+                "toggle-timed": (user) => {
+                    if (user === room.hostId) {
+                        room.timed = !room.timed;
+                        if (!room.timed) {
+                            room.paused = true;
+                            clearInterval(timerInterval);
+                        } else {
+                            if (room.phase !== 0) {
+                                room.paused = false;
+                                startTimer();
+                            } else room.paused = true;
+                        }
+                    }
+                    update();
+                },
+                "set-time": (user, type, value) => {
+                    if (user === room.hostId && ~["character", "action", "smallAction"].indexOf(type) && !isNaN(value) && value >= 1) {
+                        room[`${type}Time`] = value;
+                        room.timeChanged = true;
+                    }
+                    update();
+                },
+                "toggle-paused": (user) => {
+                    if (user === room.hostId)
+                        room.paused = !room.paused;
+                    update();
+                },
             };
         }
 

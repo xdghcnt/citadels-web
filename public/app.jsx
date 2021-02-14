@@ -679,6 +679,16 @@ class CreateGamePanel extends React.Component {
     }
 }
 
+class Timer extends React.Component {
+    render() {
+        return (
+            <div className="timer">
+                {this.props.data.time && (new Date(this.props.data.time)).toUTCString().match(/(\d\d:\d\d )/)[0].trim()}
+            </div>
+        );
+    }
+}
+
 class Game extends React.Component {
 
     componentDidMount() {
@@ -740,6 +750,8 @@ class Game extends React.Component {
         this.socket.emit("init", initArgs);
         this.turnSound = new Audio("/citadels/chime.mp3");
         this.turnSound.volume = 0.8;
+        this.timerSound = new Audio("/secret-hitler/media/tick.mp3");
+        this.timerSound.volume = 0.4;
     }
 
     constructor() {
@@ -1031,12 +1043,13 @@ class Game extends React.Component {
     }
 
     handleClickTogglePause() {
-        if (this.state.phase === 0) {
+        if (this.state.phase !== 0)
+            this.socket.emit('toggle-paused');
+        else
             this.setState({
                 ...this.state,
                 showCreateGamePanel: true
             });
-        }
     }
 
     handleClickShowCards() {
@@ -1065,6 +1078,21 @@ class Game extends React.Component {
 
     handleToggleTeamLockClick() {
         this.socket.emit("toggle-lock");
+    }
+
+    handleToggleTimed() {
+        this.socket.emit("toggle-timed");
+    }
+
+    debouncedEmit(event, data1, data2) {
+        clearTimeout(this.debouncedEmitTimer);
+        this.debouncedEmitTimer = setTimeout(() => {
+            this.socket.emit(event, data1, data2);
+        }, 50);
+    }
+
+    handleChangeTime(value, type) {
+        this.debouncedEmit("set-time", type, value || 1);
     }
 
     handleClickChangeName() {
@@ -1138,6 +1166,7 @@ class Game extends React.Component {
     }
 
     render() {
+        clearTimeout(this.timerTimeout);
         const
             data = this.state,
             isHost = data.hostId === data.userId,
@@ -1193,6 +1222,20 @@ class Game extends React.Component {
                     + data.playerDistricts[data.userSlot].some(card => card.type === "school_of_magic") : 0;
             }
             const canTakeResource = !data.tookResource && !magistrateOpenAction && !seerReturnAction;
+            if (data.timed && !data.paused) {
+                let timeStart = new Date();
+                this.timerTimeout = setTimeout(() => {
+                    if (!this.state.paused) {
+                        let prevTime = this.state.time,
+                            time = prevTime - (new Date - timeStart);
+                        this.setState(Object.assign(this.state, {time: time}));
+                        if (this.state.timed
+                            && !this.state.testMode
+                            && time < 6000 && ((Math.floor(prevTime / 1000) - Math.floor(time / 1000)) > 0))
+                            this.timerSound.play();
+                    }
+                }, 100);
+            }
             return (
                 <div
                     className={cs(`game`, {
@@ -1502,21 +1545,62 @@ class Game extends React.Component {
                     {data.showCardsPanel ?
                         <CreateGamePanel data={data} game={this} galleryMode={true}/>
                         : ""}
+                    {data.timed ? <Timer data={data}/> : ""}
                     <div className="host-controls panel">
+                        {data.timed ? (<div className="host-controls-menu">
+                            <div className="little-controls">
+                                <div className="game-settings">
+                                    <div className="set-time">
+                                        <i className="material-icons"
+                                           title="Time to enact policy and inspect">alarm
+                                            account_circle</i>
+                                        {(isHost && data.paused) ? (<input type="number"
+                                                                           value={this.state.characterTime}
+                                                                           min="1"
+                                                                           onChange={evt => !isNaN(evt.target.valueAsNumber)
+                                                                               && this.handleChangeTime(evt.target.valueAsNumber, "character")}
+                                        />) : (<span className="value">{this.state.characterTime}</span>)}
+                                        <i className="material-icons"
+                                           title="Time to all other actions besides 1">stars</i>
+                                        {(isHost && data.paused) ? (<input type="number"
+                                                                           value={this.state.actionTime}
+                                                                           min="1"
+                                                                           onChange={evt => !isNaN(evt.target.valueAsNumber)
+                                                                               && this.handleChangeTime(evt.target.valueAsNumber, "action")}
+                                        />) : (<span className="value">{this.state.actionTime}</span>)}
+                                        <i className="material-icons"
+                                           title="Time to all other actions besides 1">offline_bolt</i>
+                                        {(isHost && data.paused) ? (<input type="number"
+                                                                           value={this.state.smallActionTime}
+                                                                           min="1"
+                                                                           onChange={evt => !isNaN(evt.target.valueAsNumber)
+                                                                               && this.handleChangeTime(evt.target.valueAsNumber, "smallAction")}
+                                        />) : (<span className="value">{this.state.smallActionTime}</span>)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>) : ""}
                         <div className="side-buttons">
                             {this.state.userId === this.state.hostId ?
                                 <i onClick={() => this.socket.emit("set-room-mode", false)}
                                    className="material-icons exit settings-button">store</i> : ""}
+                            {isHost ? (!data.timed
+                                ? (<i onClick={() => this.handleToggleTimed()}
+                                      className="material-icons start-game settings-button">alarm_off</i>)
+                                : (<i onClick={() => this.handleToggleTimed()}
+                                      className="material-icons start-game settings-button">alarm</i>)) : ""}
                             {isHost ? (data.teamsLocked
                                 ? (<i onClick={() => this.handleToggleTeamLockClick()}
                                       className="material-icons start-game settings-button">lock_outline</i>)
                                 : (<i onClick={() => this.handleToggleTeamLockClick()}
                                       className="material-icons start-game settings-button">lock_open</i>)) : ""}
-                            {isHost ? (data.phase === 0
-                                ? (<i onClick={() => this.handleClickTogglePause()}
-                                      className={`material-icons start-game settings-button`}>play_arrow</i>)
-                                : <i onClick={() => this.handleClickStop()}
-                                     className="toggle-theme material-icons settings-button">stop</i>) : ""}
+                            {isHost && (data.phase !== 0 && (!data.timed || data.paused)) ? (
+                                <i onClick={() => this.handleClickStop()}
+                                   className="toggle-theme material-icons settings-button">stop</i>) : ""}
+                            {isHost ? (<i onClick={() => this.handleClickTogglePause()}
+                                          className={`material-icons start-game settings-button`}>
+                                {data.timed && !data.paused ? "pause" : "play_arrow"}
+                            </i>) : ""}
                             {!isHost || data.phase !== 0
                                 ? (<i onClick={() => this.handleClickShowCards()}
                                       className="material-icons settings-button">amp_stories</i>)

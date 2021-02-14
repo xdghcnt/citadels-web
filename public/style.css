@@ -1362,3 +1362,16 @@ button.inactive {
 .player-slot.target {
     box-shadow: 0 0 6px 3px #346bf0;
 }
+
+.timer {
+    position: fixed;
+    top: 0;
+    font-size: 25px;
+    display: flex;
+    margin: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffffffab;
+    padding: 0 9px;
+    box-shadow: 0 0 6px 1px black;
+}
