@@ -465,7 +465,7 @@ function init(wsServer, path) {
                     room.playerScore[slot] += room.playerHand[slot] * include(slot, "map_room");
                     room.playerScore[slot] += room.playerGold[slot] * include(slot, "imperial_treasury");
                     room.playerScore[slot] += room.playerDistricts[slot].filter(card => getDistrictCost(card) % 2).length * include(slot, "basilica");
-                    const museum = room.playerDistricts[slot].filter(card => card.type === "museum") || {};
+                    const museum = room.playerDistricts[slot].find(card => card.type === "museum") || {};
                     room.playerScore[slot] += museum.exposition ? museum.exposition.length : 0;
                     if (include(slot, "memorial") && room.king === slot) room.playerScore[slot] += 5;
 
