@@ -813,13 +813,13 @@ class Game extends React.Component {
         } else if (this.state.userAction === "laboratory") {
             this.socket.emit('laboratory-action', cardInd);
             this.handleStopUserAction();
-        } else if (this.state.userAction === "den_of_thieves") {
+        } else if (this.state.userAction === "den_of_thieves" && !forGold) {
             if (this.state.player.hand[cardInd].type !== "den_of_thieves")
                 this.toggleCardChoose(cardInd);
         } else if (this.state.userAction === "cardinal-action-cards") {
             if (this.state.player.hand[cardInd] !== this.state.buildTarget)
                 this.toggleCardChoose(cardInd);
-        } else if (this.state.userAction === "necropolis") {
+        } else if (this.state.userAction === "necropolis" && !forGold) {
         } else if (this.state.player.action === "seer-return") {
             this.socket.emit("seer-return", cardInd);
         } else {

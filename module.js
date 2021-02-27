@@ -39,7 +39,7 @@ function init(wsServer, path) {
                 playerScore: {}
             };
             if (testMode)
-                [1, 2, 3, 4, 5, 6, 7].forEach((_, ind) => {
+                [1, 2, 3, 4].forEach((_, ind) => {
                     room.playerSlots[ind] = `kek${ind}`;
                     room.playerNames[`kek${ind}`] = `kek${ind}`;
                 });
@@ -117,7 +117,7 @@ function init(wsServer, path) {
                                 room.playerHand[slot] = 4;
                                 if (testMode && slot === 0) {
                                     state.players[slot].hand.push(
-                                        ...utils.createDeck(state.playersCount, ["museum"], true)
+                                        ...utils.createDeck(state.playersCount, ["necropolis"], true)
                                     );
                                     room.playerHand[slot] = 0;
                                 }
