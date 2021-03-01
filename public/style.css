@@ -1362,3 +1362,15 @@ button.inactive {
 .player-slot.target {
     box-shadow: 0 0 6px 3px #346bf0;
 }
+
+.chat:not(.active) .chat-messages {
+    background: #f1f1f180 !important;
+}
+
+.chat.active .chat-tab-buttons {
+    background: #ffffff7a;
+}
+
+.chat-messages {
+    background: #f1f1f1cf;
+}
