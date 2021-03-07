@@ -1221,8 +1221,6 @@ function init(wsServer, path) {
                             return sendSlot(slot, "message", 'Вы не можете использовать Арсенал на законченном городе');
                         destroy(slot_d, cardInd);
                         destroy(slot, room.playerDistricts[slot].findIndex(card => card.type === 'arsenal'));
-                        if (getDistrictsCount(slot) < state.maxDistricts && room.ender === slot)
-                            room.ender = null;
                         countPoints(slot_d);
                         countPoints(slot);
                         update();
