@@ -1202,7 +1202,7 @@ class Game extends React.Component {
                     })}
                     onMouseUp={(evt) => this.handleBodyRelease(evt)}>
                     {data.phase !== 0 ?
-                        <div className="character-section">
+                        <div className={cs("character-section", `characters-count-${data.characterInGame.length}`)}>
                             <div className="cards-list">
                                 {data.characterInGame.map((card, id) => {
                                     const
