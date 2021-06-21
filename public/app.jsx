@@ -838,7 +838,7 @@ class Game extends React.Component {
 
     getBuildCost(cardInd) {
         const building = this.state.player.hand[cardInd];
-        return building.cost - ((building.kind === 9 && this.state.playerDistricts[this.state.userSlot].find((card) => card.kind === "factory")) ? 1 : 0);
+        return building.cost - ((building.kind === 9 && this.state.playerDistricts[this.state.userSlot].find((card) => card.type === "factory")) ? 1 : 0);
     }
 
     isCardinalActionAvailable(cardInd, target) {
