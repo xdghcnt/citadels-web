@@ -1392,7 +1392,13 @@ button.inactive {
         .characters-count-9 ~ .host-controls {
             right: 9vh;
         }
-        .character-section .cards-list .status {
+        .character-section .status.robbed,
+        .character-section .status.blackmailed,
+        .character-section .status.true-blackmailed,
+        .character-section .status.magistrated-icon,
+        .character-section .status.true-magistrated,
+        .character-section .status.witched,
+        .character-section .status.assassined {
             top: 0;
             right: 0;
             bottom: 0;
@@ -1404,10 +1410,12 @@ button.inactive {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            max-width: 90%;
+            max-width: 80%;
             width: auto;
             height: auto;
         }
+
+        .status.two-icons .assassined-icon,
         .status.two-icons .robbed-icon,
         .status.two-icons .blackmailed-icon,
         .status.two-icons .true-blackmailed-icon,
@@ -1477,6 +1485,9 @@ button.inactive {
         сохраняла пропорции и занимала не более 95% высоты экрана */
         .card-item-zoomed {
             max-height: 95vh;
+        }
+        .card.card-item .card-item-zoomed {
+            width: 60vh;
         }
         .character .card-item-zoomed {
             width: 54vh;
