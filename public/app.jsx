@@ -1386,15 +1386,15 @@ class Game extends React.Component {
                                             <button onClick={() => this.handleScholar()}>Раскопать
                                                 карту</button> : null}
                                         {(this.hasDistricts('framework') && data.player.hand.length && data.buildDistricts > 0)
-                                        && !magistrateOpenAction ?
+                                        && (!magistrateOpenAction && !seerReturnAction) ?
                                             <button onClick={() => this.setUserAction("framework")}>Исп. Строительные
                                                 леса</button> : null}
                                         {(this.hasDistricts('museum') && data.player.hand.length && data.museumAction)
-                                        && !magistrateOpenAction ?
+                                        && (!magistrateOpenAction && !seerReturnAction) ?
                                             <button onClick={() => this.setUserAction("museum")}>Исп.
                                                 Музей</button> : null}
                                         {(this.hasDistricts('laboratory') && data.player.hand.length && data.laboratoryAction)
-                                        && !magistrateOpenAction ?
+                                        && !(!magistrateOpenAction && !seerReturnAction) ?
                                             <button onClick={() => this.setUserAction("laboratory")}>Исп.
                                                 Лабораторию</button> : null}
                                         {this.hasDistricts('arsenal')

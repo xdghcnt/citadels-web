@@ -606,7 +606,9 @@ function init(wsServer, path) {
                 dropCardHand = (slot, cardInd) => state.districtDeck.push(...state.players[slot].hand.splice(cardInd, 1)),
                 dropCardDistricts = (slot, cardInd) => state.districtDeck.push(...room.playerDistricts[slot].splice(cardInd, 1)),
                 getNextReturnSeer = () => room.seerReturnPlayers[room.seerReturnPlayers.indexOf(room.seerReturnSlot) + 1],
-                isNoMagistrateAction = () => state.players[room.currentPlayer].action !== 'magistrate-open',                removePlayer = (playerId) => {
+                isNoMagistrateAction = () => state.players[room.currentPlayer].action !== 'magistrate-open',
+                isNoSeerAction = () => state.players[room.currentPlayer].action !== 'seer-return',
+                removePlayer = (playerId) => {
                     if (room.spectators.has(playerId)) {
                         this.emit("user-kicked", playerId);
                         room.spectators.delete(playerId);
@@ -1242,14 +1244,14 @@ function init(wsServer, path) {
                 },
                 "framework-action": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'framework')
-                        && state.players[slot].hand[cardInd] && isNoMagistrateAction()) {
+                        && state.players[slot].hand[cardInd] && isNoMagistrateAction() && isNoSeerAction()) {
                         const wasBuilt = build(slot, cardInd, getPlayerDistrictIndex(slot, "framework"), true)
                         if (wasBuilt[0]) tax(slot);
                     }
                 },
                 "museum-action": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'museum')
-                        && room.museumAction && state.players[slot].hand[cardInd] && isNoMagistrateAction()) {
+                        && room.museumAction && state.players[slot].hand[cardInd] && isNoMagistrateAction() && isNoSeerAction()) {
                         const museum = getPlayerDistrict(slot, "museum");
                         museum.exposition = museum.exposition || [];
                         museum.exposition.push(...state.players[slot].hand.splice(cardInd, 1));
@@ -1262,7 +1264,7 @@ function init(wsServer, path) {
                 },
                 "laboratory-action": (slot, cardInd) => {
                     if (room.phase === 2 && slot === room.currentPlayer && include(slot, 'laboratory')
-                        && room.laboratoryAction && state.players[slot].hand[cardInd] && isNoMagistrateAction()) {
+                        && room.laboratoryAction && state.players[slot].hand[cardInd] && isNoMagistrateAction() && isNoSeerAction()) {
                         dropCardHand(slot, cardInd);
                         room.playerHand[slot]--;
                         room.playerGold[slot] += 2;
