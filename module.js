@@ -989,7 +989,7 @@ function init(wsServer, path) {
                 },
                 "seer-action": (slot) => {
                     if (room.phase === 2 && state.players[slot].action === 'seer-action'
-                        && Object.keys(room.playerHand).some((player) => player !== slot && room.playerHand[player])) {
+                        && Object.keys(room.playerHand).some((player) => parseInt(player) !== slot && room.playerHand[player])) {
                         state.players[slot].action = 'seer-return';
                         room.seerReturnPlayers = [];
                         Object.keys(state.players).forEach((playerInd) => {
