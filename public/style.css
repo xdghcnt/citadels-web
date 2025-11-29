@@ -350,9 +350,10 @@ body {
     background-repeat: no-repeat;
     background-size: cover;
     display: flex;
-    align-items: center;
     justify-content: center;
     margin: 0;
+    background-attachment: fixed;
+    align-items: flex-start;
 }
 
 .game {
