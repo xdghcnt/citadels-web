@@ -7,13 +7,14 @@ function init(wsServer, path) {
         channel = "citadels",
         testMode = process.argv[2] === "debug",
         timerPresets = {
-            short: {mainDurationMs: 60000, responseDurationMs: 15000},
-            normal: {mainDurationMs: Math.max(1000, Number(process.env.CITADELS_TURN_DURATION_MS) || 120000), responseDurationMs: 30000},
-            long: {mainDurationMs: 300000, responseDurationMs: 60000}
+            short: {characterDurationMs: 90000, mainDurationMs: 60000, responseDurationMs: 15000},
+            normal: {characterDurationMs: 180000, mainDurationMs: Math.max(1000, Number(process.env.CITADELS_TURN_DURATION_MS) || 120000), responseDurationMs: 30000},
+            long: {characterDurationMs: 420000, mainDurationMs: 300000, responseDurationMs: 60000}
         },
         defaultTimerSettings = {
             enabled: true,
             preset: "normal",
+            characterDurationMs: timerPresets.normal.characterDurationMs,
             mainDurationMs: timerPresets.normal.mainDurationMs,
             responseDurationMs: timerPresets.normal.responseDurationMs
         },
@@ -37,10 +38,16 @@ function init(wsServer, path) {
                     settings && settings.responseDurationMs !== undefined ? settings.responseDurationMs : presetSettings.responseDurationMs,
                     10000,
                     120000
+                ),
+                characterDurationMs = clampDuration(
+                    settings && settings.characterDurationMs !== undefined ? settings.characterDurationMs : presetSettings.characterDurationMs,
+                    30000,
+                    900000
                 );
             return {
-                enabled: !(settings && settings.enabled === false) && !!(mainDurationMs || responseDurationMs),
+                enabled: !(settings && settings.enabled === false) && !!(characterDurationMs || mainDurationMs || responseDurationMs),
                 preset,
+                characterDurationMs,
                 mainDurationMs,
                 responseDurationMs
             };
@@ -72,6 +79,7 @@ function init(wsServer, path) {
                 currentCharacter: 0,
                 timerSettings: {...defaultTimerSettings},
                 timer: null,
+                timersPaused: false,
                 testMode,
                 playerGold: {},
                 playerHand: {},
@@ -153,9 +161,10 @@ function init(wsServer, path) {
                     clearTimerTimeout();
                     room.timer = null;
                 },
+                getTimerAllowedPhases = (kind) => kind === "character" ? [1] : (kind === "response" ? [2, 3] : [1.5, 2, 3]),
                 scheduleTimer = (delay) => {
                     clearTimerTimeout();
-                    if (delay == null)
+                    if (delay == null || room.timersPaused)
                         return;
                     const currentTimerId = timerId;
                     timerTimeout = setTimeout(() => {
@@ -168,10 +177,14 @@ function init(wsServer, path) {
                 getTimerDuration = (kind) => {
                     if (!room.timerSettings || !room.timerSettings.enabled)
                         return 0;
+                    if (kind === "character")
+                        return room.timerSettings.characterDurationMs;
                     return kind === "response" ? room.timerSettings.responseDurationMs : room.timerSettings.mainDurationMs;
                 },
                 startMainTimer = (slot, remainingMs) => {
-                    if (slot == null || !state.players[slot] || ![2, 3].includes(room.phase))
+                    if (slot == null || !state.players[slot] || !getTimerAllowedPhases("main").includes(room.phase))
+                        return clearTurnTimer();
+                    if (room.timersPaused)
                         return clearTurnTimer();
                     if (!room.timerSettings || !room.timerSettings.enabled || !room.timerSettings.mainDurationMs)
                         return clearTurnTimer();
@@ -187,8 +200,29 @@ function init(wsServer, path) {
                     };
                     scheduleTimer(duration);
                 },
+                startCharacterTimer = (slot) => {
+                    if (slot == null || !state.players[slot] || room.phase !== 1)
+                        return clearTurnTimer();
+                    if (room.timersPaused)
+                        return clearTurnTimer();
+                    const duration = getTimerDuration("character");
+                    if (!duration)
+                        return clearTurnTimer();
+                    const now = Date.now();
+                    room.timer = {
+                        kind: "character",
+                        ownerSlot: slot,
+                        character: room.currentCharacter,
+                        startedAt: now,
+                        endsAt: now + duration,
+                        durationMs: duration
+                    };
+                    scheduleTimer(duration);
+                },
                 startResponseTimer = (slot, responseType) => {
                     if (slot == null || !state.players[slot] || ![2, 3].includes(room.phase))
+                        return clearTurnTimer();
+                    if (room.timersPaused)
                         return clearTurnTimer();
                     const duration = getTimerDuration("response"),
                         now = Date.now(),
@@ -224,9 +258,45 @@ function init(wsServer, path) {
                 restoreTurnTimer = () => {
                     if (!room.timer || !room.timer.endsAt)
                         return clearTimerTimeout();
-                    if (![2, 3].includes(room.phase) || room.timer.ownerSlot == null || room.timer.character !== room.currentCharacter)
+                    if (!getTimerAllowedPhases(room.timer.kind).includes(room.phase) || room.timer.ownerSlot == null || room.timer.character !== room.currentCharacter)
                         return clearTurnTimer();
                     scheduleTimer(room.timer.endsAt - Date.now());
+                },
+                restartCurrentTimer = () => {
+                    if (!room.timerSettings || !room.timerSettings.enabled || room.currentPlayer == null || !state.players[room.currentPlayer])
+                        return clearTurnTimer();
+                    if (room.phase === 1)
+                        return startCharacterTimer(room.currentPlayer);
+                    if (room.phase === 1.5 && state.players[room.currentPlayer].action === "theater-action")
+                        return startMainTimer(room.currentPlayer);
+                    if ([2, 3].includes(room.phase)) {
+                        const action = state.players[room.currentPlayer].action;
+                        if (room.witched === room.currentCharacter && room.witchedstate === 2)
+                            return startResponseTimer(room.currentPlayer, "witch");
+                        if (["blackmailed-response", "blackmailed-open", "magistrate-open"].includes(action))
+                            return startResponseTimer(room.currentPlayer, action);
+                        return startMainTimer(room.currentPlayer);
+                    }
+                    clearTurnTimer();
+                },
+                toggleTimersPause = () => {
+                    room.timersPaused = !room.timersPaused;
+                    if (room.timersPaused)
+                        clearTurnTimer();
+                    else
+                        restartCurrentTimer();
+                    update();
+                },
+                expireCharacterTimer = (timer) => {
+                    const slot = timer.ownerSlot,
+                        player = state.players[slot];
+                    if (room.phase !== 1 || slot !== room.currentPlayer || !player || !["choose", "discard"].includes(player.action) || !state.characterDeck.length)
+                        return clearTurnTimer();
+                    const cardIndex = Math.floor(Math.random() * state.characterDeck.length);
+                    if (player.action === "choose")
+                        this.slotEventHandlers["take-character"](slot, cardIndex);
+                    else
+                        this.slotEventHandlers["discard-character"](slot, cardIndex);
                 },
                 expireResponseTimer = (timer) => {
                     const slot = timer.ownerSlot;
@@ -247,14 +317,17 @@ function init(wsServer, path) {
                 },
                 expireTimer = () => {
                     const timer = room.timer;
-                    if (!timer || (timer.character !== room.currentCharacter) || ![2, 3].includes(room.phase))
+                    if (!timer || (timer.character !== room.currentCharacter) || !getTimerAllowedPhases(timer.kind).includes(room.phase))
                         return clearTurnTimer();
+                    if (timer.kind === "character")
+                        return expireCharacterTimer(timer);
                     if (timer.kind === "response")
                         return expireResponseTimer(timer);
                     const slot = timer.ownerSlot;
+                    if (room.phase === 1.5 && slot === room.currentPlayer && state.players[slot] && state.players[slot].action === "theater-action")
+                        return this.slotEventHandlers["theater-action"](slot, slot);
                     if (slot == null || slot !== room.currentPlayer || !state.players[slot])
                         return clearTurnTimer();
-                    sendSlot(slot, "message", "Время хода истекло.");
                     finishTurn(slot, true);
                 },
                 startGame = (districts, timerSettings) => {
@@ -262,6 +335,7 @@ function init(wsServer, path) {
                     if (state.playersCount > 1) {
                         room.timerSettings = normalizeTimerSettings(timerSettings);
                         room.timer = null;
+                        room.timersPaused = false;
                         room.targetSlot = null;
                         room.playerGold = {};
                         room.playerHand = {};
@@ -338,6 +412,7 @@ function init(wsServer, path) {
                     room.currentPlayer = room.king;
                     state.players[room.currentPlayer].action = 'choose';
                     state.players[room.currentPlayer].choose = state.characterDeck;
+                    startCharacterTimer(room.currentPlayer);
                     update();
                     updateState();
                 },
@@ -354,6 +429,7 @@ function init(wsServer, path) {
                         room.currentPlayer = getNextPlayer();
                         state.players[room.currentPlayer].action = 'choose';
                         state.players[room.currentPlayer].choose = state.characterDeck;
+                        startCharacterTimer(room.currentPlayer);
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else if (state.playersCount + 1 === room.characterInGame.length && state.discarded) {
@@ -363,6 +439,7 @@ function init(wsServer, path) {
                         room.currentPlayer = getNextPlayer();
                         state.players[room.currentPlayer].action = 'choose';
                         state.players[room.currentPlayer].choose = state.characterDeck;
+                        startCharacterTimer(room.currentPlayer);
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else {
@@ -376,6 +453,7 @@ function init(wsServer, path) {
                             sendStateSlot(room.currentPlayer);
                             room.currentPlayer = _theater;
                             state.players[room.currentPlayer].action = 'theater-action';
+                            startMainTimer(room.currentPlayer);
                             update();
                             sendStateSlot(room.currentPlayer);
                         }
@@ -392,12 +470,14 @@ function init(wsServer, path) {
                             room.currentPlayer = getNextPlayer();
                             state.players[room.currentPlayer].action = 'choose';
                             state.players[room.currentPlayer].choose = state.characterDeck;
+                            startCharacterTimer(room.currentPlayer);
                             update();
                             sendStateSlot(room.currentPlayer);
                             break;
                         case 5:
                         case 3:
                             state.players[room.currentPlayer].action = 'discard';
+                            startCharacterTimer(room.currentPlayer);
                             update();
                             sendStateSlot(room.currentPlayer);
                             break;
@@ -716,10 +796,27 @@ function init(wsServer, path) {
                     state.players[slot].choose = null;
                     state.players[slot].chooseSource = null;
                 },
+                autoEmperorCrown = (slot) => {
+                    const candidates = Object.keys(state.players)
+                        .map(Number)
+                        .filter(playerSlot => playerSlot !== slot && playerSlot !== room.king && state.players[playerSlot]);
+                    if (!candidates.length) {
+                        state.emperorAction = true;
+                        state.players[slot].action = null;
+                        return;
+                    }
+                    const targetSlot = candidates[Math.floor(Math.random() * candidates.length)];
+                    this.slotEventHandlers["emperor-crown"](slot, targetSlot, "coin");
+                },
                 finishTurn = (slot, forced) => {
                     if (forced) {
                         if (![2, 3].includes(room.phase) || !room.timer || slot !== room.timer.ownerSlot || !state.players[slot])
                             return;
+                        if (['emperor-action', 'emperor-nores-action'].includes(state.players[slot].action)) {
+                            autoEmperorCrown(slot);
+                            if (room.phase !== 2 || !state.players[slot])
+                                return;
+                        }
                         prepareForcedFinishTurn(slot);
                     }
                     if (room.phase === 2 && slot === room.currentPlayer && (forced || room.tookResource)) {
@@ -973,7 +1070,7 @@ function init(wsServer, path) {
                             sendStateSlot(slot_d);
                         }
                         room.phase = 2;
-                        state.players[slot].action === null;
+                        state.players[slot].action = null;
                         sendStateSlot(slot);
                         nextCharacter();
                     }
@@ -1667,6 +1764,10 @@ function init(wsServer, path) {
                     if (user === room.hostId)
                         room.teamsLocked = !room.teamsLocked;
                     update();
+                },
+                "toggle-timers-pause": (user) => {
+                    if (user === room.hostId)
+                        toggleTimersPause();
                 },
                 "players-join": (user, slot) => {
                     if (!room.teamsLocked && room.playerSlots[slot] === null) {

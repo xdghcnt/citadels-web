@@ -335,9 +335,9 @@ class CreateGamePanel extends React.Component {
 
     getTimerPresets() {
         return {
-            short: {name: "Short", mainDurationMs: 60000, responseDurationMs: 15000},
-            normal: {name: "Normal", mainDurationMs: 120000, responseDurationMs: 30000},
-            long: {name: "Long", mainDurationMs: 300000, responseDurationMs: 60000}
+            short: {name: "Short", characterDurationMs: 90000, mainDurationMs: 60000, responseDurationMs: 15000},
+            normal: {name: "Normal", characterDurationMs: 180000, mainDurationMs: 120000, responseDurationMs: 30000},
+            long: {name: "Long", characterDurationMs: 420000, mainDurationMs: 300000, responseDurationMs: 60000}
         };
     }
 
@@ -347,6 +347,7 @@ class CreateGamePanel extends React.Component {
             this.state.timerSettings = {
                 enabled: timerSettings.enabled !== false,
                 preset: timerSettings.preset || "normal",
+                characterDurationMs: timerSettings.characterDurationMs || 180000,
                 mainDurationMs: timerSettings.mainDurationMs || 120000,
                 responseDurationMs: timerSettings.responseDurationMs || 30000
             };
@@ -359,6 +360,7 @@ class CreateGamePanel extends React.Component {
         this.state.timerSettings = {
             enabled: true,
             preset,
+            characterDurationMs: presetSettings.characterDurationMs,
             mainDurationMs: presetSettings.mainDurationMs,
             responseDurationMs: presetSettings.responseDurationMs
         };
@@ -372,13 +374,15 @@ class CreateGamePanel extends React.Component {
 
     handleTimerDurationChange(kind, value) {
         let duration = Number(value);
+        if (kind === "characterDurationMs" && duration > 0 && duration < 30000)
+            duration = 30000;
         if (kind === "mainDurationMs" && duration > 0 && duration < 30000)
             duration = 30000;
         if (kind === "responseDurationMs" && duration > 0 && duration < 10000)
             duration = 10000;
         this.state.timerSettings[kind] = duration;
         this.state.timerSettings.preset = "custom";
-        this.state.timerSettings.enabled = !!(this.state.timerSettings.mainDurationMs || this.state.timerSettings.responseDurationMs);
+        this.state.timerSettings.enabled = !!(this.state.timerSettings.characterDurationMs || this.state.timerSettings.mainDurationMs || this.state.timerSettings.responseDurationMs);
         this.setState(this.state);
     }
 
@@ -770,6 +774,15 @@ class CreateGamePanel extends React.Component {
                                 </div>)}
                         </div>
                         <div className="timer-slider-row">
+                            <div className="timer-slider-label">Character: {this.formatTimerDuration(timerSettings.characterDurationMs)}</div>
+                            <input type="range"
+                                   min="0"
+                                   max="900000"
+                                   step="30000"
+                                   value={timerSettings.characterDurationMs}
+                                   onChange={(evt) => this.handleTimerDurationChange("characterDurationMs", evt.target.value)}/>
+                        </div>
+                        <div className="timer-slider-row">
                             <div className="timer-slider-label">Main: {this.formatTimerDuration(timerSettings.mainDurationMs)}</div>
                             <input type="range"
                                    min="0"
@@ -820,16 +833,20 @@ class Game extends React.Component {
             }, this);
             if (this.state && this.state.currentPlayer !== this.state.userSlot && state.currentPlayer === this.state.userSlot)
                 this.turnSound.play();
-            this.setState(Object.assign({
+            const nextState = Object.assign({}, this.state, {
                 userId: this.userId,
                 userSlot: state.playerSlots.indexOf(this.userId),
                 serverReceivedAt: Date.now()
-            }, state));
+            }, state);
+            this.resetLocalActionIfStale(nextState);
+            this.setState(nextState);
         });
         this.socket.on("player-state", (player) => {
-            this.setState(Object.assign(this.state, {
+            const nextState = Object.assign({}, this.state, {
                 player: player
-            }));
+            });
+            this.resetLocalActionIfStale(nextState);
+            this.setState(nextState);
         });
         this.socket.on("prompt-delete-prev-room", (roomList) => {
             if (localStorage.acceptDelete =
@@ -853,6 +870,38 @@ class Game extends React.Component {
         this.socket.emit("init", initArgs);
         this.turnSound = new Audio("/citadels/chime.mp3");
         this.turnSound.volume = 0.8;
+    }
+
+    resetLocalActionIfStale(state) {
+        const
+            hasLocalSelection = state.userAction || state.cardChosen.length || state.playerChosen !== null || state.buildTarget !== null,
+            player = state.player || {},
+            isCurrentPlayer = state.currentPlayer === state.userSlot,
+            resetLocalSelection = () => {
+                state.userAction = null;
+                state.cardChosen = [];
+                state.playerChosen = null;
+                state.buildTarget = null;
+            };
+        if (!hasLocalSelection)
+            return;
+        if (!isCurrentPlayer || state.phase === 0 || state.winnerPlayer != null)
+            return resetLocalSelection();
+        if (state.userAction) {
+            const actionByUserAction = {
+                magician: "magician-action",
+                emperor: "emperor-action",
+                spy: "spy-action",
+                "cardinal-action-player": "cardinal-action",
+                "cardinal-action-cards": "cardinal-action"
+            };
+            if (actionByUserAction[state.userAction] && player.action !== actionByUserAction[state.userAction])
+                return resetLocalSelection();
+            if (!actionByUserAction[state.userAction] && state.phase !== 2)
+                return resetLocalSelection();
+        } else if (state.cardChosen.length && !["magistrate-action", "blackmailer-action", "diplomat-action"].includes(player.action)) {
+            return resetLocalSelection();
+        }
     }
 
     constructor() {
@@ -1179,6 +1228,10 @@ class Game extends React.Component {
         this.socket.emit("toggle-lock");
     }
 
+    handleToggleTimersPause() {
+        this.socket.emit("toggle-timers-pause");
+    }
+
     handleClickChangeName() {
         const name = prompt("New name");
         this.socket.emit("change-name", name);
@@ -1386,7 +1439,6 @@ class Game extends React.Component {
                             : null}
                         {data.player && data.currentPlayer === data.userSlot ?
                             <div className="action-section">
-                                {data.timer && data.timer.ownerSlot === data.userSlot ? <TimerDisplay data={data}/> : null}
                                 {data.phase == 1 ?
                                     <div className={
                                         "choose-character"
@@ -1631,6 +1683,13 @@ class Game extends React.Component {
                                       className={`material-icons start-game settings-button`}>play_arrow</i>)
                                 : <i onClick={() => this.handleClickStop()}
                                      className="toggle-theme material-icons settings-button">stop</i>) : ""}
+                            {isHost && data.phase !== 0 && data.winnerPlayer == null
+                                ? (<i onClick={() => this.handleToggleTimersPause()}
+                                      className="material-icons settings-button"
+                                      title={data.timersPaused ? "Resume timers" : "Pause timers"}>
+                                    {data.timersPaused ? "play_arrow" : "pause"}
+                                </i>)
+                                : ""}
                             {!isHost || data.phase !== 0
                                 ? (<i onClick={() => this.handleClickShowCards()}
                                       className="material-icons settings-button">amp_stories</i>)
