@@ -140,6 +140,39 @@ class Card extends React.Component {
     }
 }
 
+class TimerDisplay extends React.Component {
+    constructor() {
+        super();
+        this.state = {now: Date.now()};
+    }
+
+    componentDidMount() {
+        this.interval = setInterval(() => this.setState({now: Date.now()}), 1000);
+    }
+
+    componentWillUnmount() {
+        clearInterval(this.interval);
+    }
+
+    render() {
+        const
+            data = this.props.data,
+            timer = data.timer;
+        if (!timer || !timer.endsAt)
+            return null;
+        const
+            serverOffset = (data.serverTime || this.state.now) - (data.serverReceivedAt || this.state.now),
+            remainingMs = Math.max(0, timer.endsAt - (this.state.now + serverOffset)),
+            totalSeconds = Math.ceil(remainingMs / 1000),
+            minutes = Math.floor(totalSeconds / 60),
+            seconds = totalSeconds % 60,
+            value = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+        return <div className={cs("timer-display", {
+            "timer-warning": remainingMs <= 10000
+        })}>{value}</div>;
+    }
+}
+
 class PlayerSlot extends React.Component {
     render() {
         const
@@ -179,6 +212,7 @@ class PlayerSlot extends React.Component {
                                     game={game}
                                     handlePlayerJoin={(slot) => game.handlePlayerJoin(slot)}/>
                         </div>
+                        {data.timer && data.timer.ownerSlot === slot ? <TimerDisplay data={data}/> : null}
                     </div>
                     <div className="characters-list">
                         {character && character.map((card, id) => (
@@ -297,6 +331,62 @@ class CreateGamePanel extends React.Component {
             this.state.charactersSelected = new Set(characters);
             return true;
         }
+    }
+
+    getTimerPresets() {
+        return {
+            short: {name: "Short", mainDurationMs: 60000, responseDurationMs: 15000},
+            normal: {name: "Normal", mainDurationMs: 120000, responseDurationMs: 30000},
+            long: {name: "Long", mainDurationMs: 300000, responseDurationMs: 60000}
+        };
+    }
+
+    getTimerSettings(data) {
+        if (!this.state.timerSettings) {
+            const timerSettings = data.timerSettings || this.getTimerPresets().normal;
+            this.state.timerSettings = {
+                enabled: timerSettings.enabled !== false,
+                preset: timerSettings.preset || "normal",
+                mainDurationMs: timerSettings.mainDurationMs || 120000,
+                responseDurationMs: timerSettings.responseDurationMs || 30000
+            };
+        }
+        return this.state.timerSettings;
+    }
+
+    handleClickTimerPreset(preset) {
+        const presetSettings = this.getTimerPresets()[preset];
+        this.state.timerSettings = {
+            enabled: true,
+            preset,
+            mainDurationMs: presetSettings.mainDurationMs,
+            responseDurationMs: presetSettings.responseDurationMs
+        };
+        this.setState(this.state);
+    }
+
+    handleTimerEnabledChange(evt) {
+        this.state.timerSettings.enabled = evt.target.checked;
+        this.setState(this.state);
+    }
+
+    handleTimerDurationChange(kind, value) {
+        let duration = Number(value);
+        if (kind === "mainDurationMs" && duration > 0 && duration < 30000)
+            duration = 30000;
+        if (kind === "responseDurationMs" && duration > 0 && duration < 10000)
+            duration = 10000;
+        this.state.timerSettings[kind] = duration;
+        this.state.timerSettings.preset = "custom";
+        this.state.timerSettings.enabled = !!(this.state.timerSettings.mainDurationMs || this.state.timerSettings.responseDurationMs);
+        this.setState(this.state);
+    }
+
+    formatTimerDuration(durationMs) {
+        if (!durationMs)
+            return "off";
+        const seconds = Math.floor(durationMs / 1000);
+        return seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60}m` : `${seconds}s`;
     }
 
     getPresets() {
@@ -558,6 +648,9 @@ class CreateGamePanel extends React.Component {
 
         if (!this.presets)
             this.presets = this.getPresets();
+        if (!this.timerPresets)
+            this.timerPresets = this.getTimerPresets();
+        const timerSettings = this.getTimerSettings(data);
 
         if (this.state.presetSelected === undefined || (data.phase !== 0 && this.wasNotStarted)) {
             if (data.presetSelected)
@@ -661,6 +754,40 @@ class CreateGamePanel extends React.Component {
                             </div>
                         ))}
                     </div>
+                    {!galleryMode ? <div className="timer-settings">
+                        <div className="create-game-subtitle">Timers</div>
+                        <label className="timer-enabled">
+                            <input type="checkbox"
+                                   checked={timerSettings.enabled}
+                                   onChange={(evt) => this.handleTimerEnabledChange(evt)}/>
+                            Enabled
+                        </label>
+                        <div className="timer-presets-list">
+                            {Object.keys(this.timerPresets).map((preset) =>
+                                <div className={cs("timer-preset-item", {selected: timerSettings.preset === preset})}
+                                     onClick={() => this.handleClickTimerPreset(preset)}>
+                                    {this.timerPresets[preset].name}
+                                </div>)}
+                        </div>
+                        <div className="timer-slider-row">
+                            <div className="timer-slider-label">Main: {this.formatTimerDuration(timerSettings.mainDurationMs)}</div>
+                            <input type="range"
+                                   min="0"
+                                   max="600000"
+                                   step="30000"
+                                   value={timerSettings.mainDurationMs}
+                                   onChange={(evt) => this.handleTimerDurationChange("mainDurationMs", evt.target.value)}/>
+                        </div>
+                        <div className="timer-slider-row">
+                            <div className="timer-slider-label">Response: {this.formatTimerDuration(timerSettings.responseDurationMs)}</div>
+                            <input type="range"
+                                   min="0"
+                                   max="120000"
+                                   step="5000"
+                                   value={timerSettings.responseDurationMs}
+                                   onChange={(evt) => this.handleTimerDurationChange("responseDurationMs", evt.target.value)}/>
+                        </div>
+                    </div> : ""}
                 </div>
                 <div className="create-game-buttons">
                     <button
@@ -671,7 +798,8 @@ class CreateGamePanel extends React.Component {
                         && game.handleClickCreateGame(
                             [...this.state.charactersSelected],
                             [...this.state.districtsSelected],
-                            this.state.presetSelected)}>Создать
+                            this.state.presetSelected,
+                            this.state.timerSettings)}>Создать
                     </button> : ""}
                 </div>
             </div>
@@ -694,7 +822,8 @@ class Game extends React.Component {
                 this.turnSound.play();
             this.setState(Object.assign({
                 userId: this.userId,
-                userSlot: state.playerSlots.indexOf(this.userId)
+                userSlot: state.playerSlots.indexOf(this.userId),
+                serverReceivedAt: Date.now()
             }, state));
         });
         this.socket.on("player-state", (player) => {
@@ -1029,8 +1158,8 @@ class Game extends React.Component {
         });
     }
 
-    handleClickCreateGame(charactersSelected, districtsSelected, presetSelected) {
-        this.socket.emit("start-game", charactersSelected, districtsSelected, presetSelected);
+    handleClickCreateGame(charactersSelected, districtsSelected, presetSelected, timerSettings) {
+        this.socket.emit("start-game", charactersSelected, districtsSelected, presetSelected, timerSettings);
         this.handleClickCloseCreateGame();
     }
 
@@ -1257,6 +1386,7 @@ class Game extends React.Component {
                             : null}
                         {data.player && data.currentPlayer === data.userSlot ?
                             <div className="action-section">
+                                {data.timer && data.timer.ownerSlot === data.userSlot ? <TimerDisplay data={data}/> : null}
                                 {data.phase == 1 ?
                                     <div className={
                                         "choose-character"
