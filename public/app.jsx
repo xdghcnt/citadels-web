@@ -104,7 +104,8 @@ class Card extends React.Component {
             diplomatCard = data.player && data.player.action === 'diplomat-action' && this.props.play && !isCharacter
                 && data.cardChosen[0] === this.props.slot && data.cardChosen[1] === this.props.id,
             currentCharacter = data.currentCharacter === card && isToken,
-            isSecretVault = card.type === "secret_vault";
+            isSecretVault = card.type === "secret_vault",
+            decorationCount = card.decoration === true ? 1 : (card.decoration || 0);
         return (
             <div className={cs(type, "card-item", {
                 "card-chosen": cardChosen || blackmailedChosen || diplomatCard,
@@ -112,7 +113,7 @@ class Card extends React.Component {
                 "card-wizard": card.wizard,
                 "current-character": currentCharacter,
                 "secret-vault": isSecretVault,
-                "decoration": card.decoration,
+                "decoration": decorationCount,
                 "in-action": !isCharacter && (data.userAction === card.type || (data.buildTarget === this.props.id && this.props.inHand)),
                 "witched-state": !isGallery && !isToken && data.witchedstate === 1 && originalCard === data.witched
             })}
@@ -125,7 +126,9 @@ class Card extends React.Component {
                                         onTouchStart={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
                 {card !== "0_1" ? (<div className={`card-item-zoomed`}
                                         style={{"background-image": backgroundImageZoomed}}/>) : ""}
-                {card.decoration ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}/> : ""}
+                {decorationCount ? <div className="decoration-coin" style={{top: `${20 * card.cost}px`}}>
+                    {decorationCount > 1 ? <span className="decoration-count">{decorationCount}</span> : ""}
+                </div> : ""}
                 {card === "9_3" && isToken ? <div className={cs("tax-counter", {empty: !data.tax})}>
                     <div className="tax-counter-coin"/>
                     <div className="tax-counter-value">{data.tax || 0}</div>
@@ -194,7 +197,8 @@ class PlayerSlot extends React.Component {
             playerChosen = data.playerChosen === slot,
             score = data.playerScore[slot],
             isMyTurn = slot === data.currentPlayer,
-            isWinner = slot === data.winnerPlayer;
+            winnerPlayers = data.winnerPlayers || [],
+            isWinner = slot === data.winnerPlayer || winnerPlayers.includes(slot);
         return (
             <div className={cs(`player-slot`, `player-slot-${slot}`, {
                 "my-turn": isMyTurn,

@@ -109,6 +109,7 @@ h1, h2, h3 {
 .profile-head {
     display: flex;
     position: relative;
+    min-width: 0;
 }
 
 .profile-name {
@@ -117,8 +118,26 @@ h1, h2, h3 {
     width: 100%;
     flex-wrap: nowrap;
     padding-top: 2px;
-    padding-right: 56px;
+    padding-left: 4px;
+    padding-right: 4px;
     box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+}
+
+.profile-name .player {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    width: 100%;
+}
+
+.profile-name .player-name-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -922,6 +941,16 @@ button {
     box-shadow: 0px -1px 2px 1px #0000005c;
     border-radius: 19px;
     filter: grayscale(0.1);
+}
+
+.decoration-count {
+    color: white;
+    display: block;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 23px;
+    text-align: center;
+    text-shadow: 0 1px 2px black;
 }
 
 .create-game-panel {

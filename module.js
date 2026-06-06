@@ -85,7 +85,8 @@ function init(wsServer, path) {
                 playerHand: {},
                 playerDistricts: {},
                 playerCharacter: {},
-                playerScore: {}
+                playerScore: {},
+                winnerPlayers: []
             };
             if (testMode)
                 [1, 2, 3, 4].forEach((_, ind) => {
@@ -328,7 +329,7 @@ function init(wsServer, path) {
                         return this.slotEventHandlers["theater-action"](slot, slot);
                     if (slot == null || slot !== room.currentPlayer || !state.players[slot])
                         return clearTurnTimer();
-                    finishTurn(slot, true);
+                    finishTurn(slot, true, true);
                 },
                 startGame = (districts, timerSettings) => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
@@ -342,6 +343,7 @@ function init(wsServer, path) {
                         room.playerDistricts = {};
                         room.playerCharacter = {};
                         room.playerScore = {};
+                        room.winnerPlayers = [];
                         room.teamsLocked = true;
                         state.districtDeck = utils.createDeck(state.playersCount, districts);
                         if (room.winnerPlayer != null)
@@ -369,6 +371,7 @@ function init(wsServer, path) {
                         room.king = getRandomPlayer();
                         room.ender = null;
                         room.winnerPlayer = null;
+                        room.winnerPlayers = [];
                         room.tax = 0;
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
                         state.wizardPlayer = null
@@ -409,6 +412,7 @@ function init(wsServer, path) {
                     state.trueBlackmailed = null;
                     room.witchedstate = 0;
                     state.emperorAction = false;
+                    delete state.forceEndAfterBlackmail;
                     room.currentPlayer = room.king;
                     state.players[room.currentPlayer].action = 'choose';
                     state.players[room.currentPlayer].choose = state.characterDeck;
@@ -700,19 +704,26 @@ function init(wsServer, path) {
                         state.players[slot].character = [];
                         room.playerCharacter[slot] = [];
                     });
-                    let maxPoints = 0;
-                    for (let i = 0; i < room.characterInGame.length; i++) {
-                        const role = room.characterInGame[i];
-                        if (state.characterRoles[role] !== null)
-                            if (room.playerScore[state.characterRoles[role]] >= maxPoints) {
-                                maxPoints = room.playerScore[state.characterRoles[role]];
-                                room.winnerPlayer = state.characterRoles[role];
-                                if (finished) {
-                                    const userData = {user: room.playerSlots[room.winnerPlayer], room};
-                                    registry.authUsers.processAchievement(userData, registry.achievements.win100Citadels.id);
-                                    registry.authUsers.processAchievement(userData, registry.achievements.winGames.id, {game: registry.games.citadels.id});
-                                }
-                            }
+                    const getPrintedDistrictCost = (slot) => room.playerDistricts[slot].map(card => card.cost).reduce((a, b) => a + b, 0);
+                    let winners = Object.keys(state.players).map(Number);
+                    [
+                        (slot) => room.playerScore[slot],
+                        getPrintedDistrictCost,
+                        (slot) => room.playerGold[slot]
+                    ].forEach(scoreFn => {
+                        if (winners.length < 2)
+                            return;
+                        const maxScore = Math.max(...winners.map(scoreFn));
+                        winners = winners.filter(slot => scoreFn(slot) === maxScore);
+                    });
+                    room.winnerPlayers = winners;
+                    room.winnerPlayer = winners[0];
+                    if (finished) {
+                        winners.forEach(slot => {
+                            const userData = {user: room.playerSlots[slot], room};
+                            registry.authUsers.processAchievement(userData, registry.achievements.win100Citadels.id);
+                            registry.authUsers.processAchievement(userData, registry.achievements.winGames.id, {game: registry.games.citadels.id});
+                        });
                     }
                     room.phase = 0;
 
@@ -767,6 +778,9 @@ function init(wsServer, path) {
                     room.seerReturnSlot = null;
                     room.seerReturnPlayers = null;
                 },
+                isForceEndAfterBlackmail = (slot) => state.forceEndAfterBlackmail
+                    && state.forceEndAfterBlackmail.slot === slot
+                    && state.forceEndAfterBlackmail.character === room.currentCharacter,
                 prepareForcedFinishTurn = (slot) => {
                     finishPhase3Turn(slot);
                     const responderSlot = room.currentPlayer;
@@ -808,10 +822,22 @@ function init(wsServer, path) {
                     const targetSlot = candidates[Math.floor(Math.random() * candidates.length)];
                     this.slotEventHandlers["emperor-crown"](slot, targetSlot, "coin");
                 },
-                finishTurn = (slot, forced) => {
+                finishTurn = (slot, forced, fromTimer) => {
                     if (forced) {
-                        if (![2, 3].includes(room.phase) || !room.timer || slot !== room.timer.ownerSlot || !state.players[slot])
+                        if (![2, 3].includes(room.phase) || !state.players[slot] || (!fromTimer && (!room.timer || slot !== room.timer.ownerSlot)))
                             return;
+                        if (room.phase === 3)
+                            finishPhase3Turn(slot);
+                        if (room.phase !== 2 || !state.players[slot])
+                            return;
+                        room.currentPlayer = slot;
+                        if (room.blackmailed.includes(room.currentCharacter) && !['blackmailed-response', 'blackmailed-open'].includes(state.players[slot].action)) {
+                            state.forceEndAfterBlackmail = {slot, character: room.currentCharacter};
+                            moveToResponse(true);
+                            if (state.players[slot] && state.players[slot].action === 'blackmailed-response')
+                                this.slotEventHandlers["blackmailed-response"](slot, "no");
+                            return;
+                        }
                         if (['emperor-action', 'emperor-nores-action'].includes(state.players[slot].action)) {
                             autoEmperorCrown(slot);
                             if (room.phase !== 2 || !state.players[slot])
@@ -848,6 +874,8 @@ function init(wsServer, path) {
                 },
                 countPoints = (slot) => {
                     room.playerScore[slot] = room.playerDistricts[slot].map(card => getDistrictCost(card)).reduce((a, b) => a + b, 0);
+                    const decorationsCount = room.playerDistricts[slot].map(card => getDecorationCount(card)).reduce((a, b) => a + b, 0);
+                    room.playerScore[slot] += Math.floor(decorationsCount / 2);
                     if (room.ender == slot) room.playerScore[slot] += 2;
                     if (getDistrictsCount(slot) >= state.maxDistricts) room.playerScore[slot] += 2;
 
@@ -885,7 +913,8 @@ function init(wsServer, path) {
                     return districtsCount;
                 },
                 include = (slot, card) => room.playerDistricts[slot].some(building => building.type === card),
-                getDistrictCost = (card) => card.cost + (card.decoration ? 1 : 0),
+                getDecorationCount = (card) => card.decoration === true ? 1 : (card.decoration || 0),
+                getDistrictCost = (card) => card.cost + getDecorationCount(card),
                 getBuildCost = (slot, card) => card.cost - ((include(slot, "factory") && card.kind === 9) ? 1 : 0),
                 isCharactersValid = (characters) => {
                     if (!([8, 9].includes(characters.length) && characters.every((character, index) => {
@@ -1279,6 +1308,7 @@ function init(wsServer, path) {
                     if (room.phase === 2 && state.players[slot].action === 'blackmailed-open' && ~['yes', 'no'].indexOf(ans)) {
                         state.players[slot].action = null;
                         const blackmailedSlot = state.characterRoles[room.currentCharacter];
+                        const forceEnd = isForceEndAfterBlackmail(blackmailedSlot);
                         if (ans === 'yes') {
                             room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
                             if (state.trueBlackmailed === room.currentCharacter) {
@@ -1298,7 +1328,12 @@ function init(wsServer, path) {
                         sendStateSlot(room.currentPlayer);
                         room.currentPlayer = blackmailedSlot;
                         startTurn();
-                        restorePausedMainTimer(blackmailedSlot);
+                        if (forceEnd) {
+                            delete state.forceEndAfterBlackmail;
+                            finishTurn(blackmailedSlot, true, true);
+                        } else {
+                            restorePausedMainTimer(blackmailedSlot);
+                        }
                         update();
                     }
                 },
@@ -1731,8 +1766,9 @@ function init(wsServer, path) {
                 },
                 "beautify": (slot, slot_d, cardInd) => {
                     if (room.phase === 2 && state.players[slot].action === 'artist-action' && state.players[slot].artistAction
-                        && slot === slot_d && room.playerDistricts[slot][cardInd] && !room.playerDistricts[slot][cardInd].decoration && room.playerGold[slot]) {
-                        room.playerDistricts[slot][cardInd].decoration = true;
+                        && slot === slot_d && room.playerDistricts[slot][cardInd] && room.playerGold[slot]) {
+                        const building = room.playerDistricts[slot][cardInd];
+                        building.decoration = getDecorationCount(building) + 1;
                         state.players[slot].artistAction -= 1;
                         room.playerGold[slot] -= 1;
                         countPoints(slot);
