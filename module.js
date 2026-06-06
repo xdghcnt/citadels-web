@@ -879,7 +879,7 @@ function init(wsServer, path) {
                     if (room.ender == slot) room.playerScore[slot] += 2;
                     if (getDistrictsCount(slot) >= state.maxDistricts) room.playerScore[slot] += 2;
 
-                    room.playerScore[slot] += 2 * include(slot, "dragon_gate");
+                    room.playerScore[slot] += 3 * include(slot, "dragon_gate");
                     room.playerScore[slot] += room.playerHand[slot] * include(slot, "map_room");
                     room.playerScore[slot] += room.playerGold[slot] * include(slot, "imperial_treasury");
                     room.playerScore[slot] += room.playerDistricts[slot].filter(card => getDistrictCost(card) % 2).length * include(slot, "basilica");
