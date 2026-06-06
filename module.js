@@ -7,9 +7,9 @@ function init(wsServer, path) {
         channel = "citadels",
         testMode = process.argv[2] === "debug",
         timerPresets = {
-            short: {characterDurationMs: 90000, mainDurationMs: 60000, responseDurationMs: 15000},
-            normal: {characterDurationMs: 180000, mainDurationMs: Math.max(1000, Number(process.env.CITADELS_TURN_DURATION_MS) || 120000), responseDurationMs: 30000},
-            long: {characterDurationMs: 420000, mainDurationMs: 300000, responseDurationMs: 60000}
+            short: {characterDurationMs: 60000, mainDurationMs: 40000, responseDurationMs: 10000},
+            normal: {characterDurationMs: 90000, mainDurationMs: 75000, responseDurationMs: 20000},
+            long: {characterDurationMs: 150000, mainDurationMs: 150000, responseDurationMs: 40000}
         },
         defaultTimerSettings = {
             enabled: true,

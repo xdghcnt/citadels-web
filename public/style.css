@@ -1001,7 +1001,6 @@ button {
 .timer-settings {
     margin-top: 12px;
     padding-top: 10px;
-    border-top: 1px solid #77777766;
 }
 
 .timer-enabled {
@@ -1041,7 +1040,6 @@ button {
 }
 
 .timer-slider-label {
-    width: 112px;
     text-align: right;
     font-variant-numeric: tabular-nums;
 }

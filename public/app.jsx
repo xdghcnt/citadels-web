@@ -339,9 +339,9 @@ class CreateGamePanel extends React.Component {
 
     getTimerPresets() {
         return {
-            short: {name: "Short", characterDurationMs: 90000, mainDurationMs: 60000, responseDurationMs: 15000},
-            normal: {name: "Normal", characterDurationMs: 180000, mainDurationMs: 120000, responseDurationMs: 30000},
-            long: {name: "Long", characterDurationMs: 420000, mainDurationMs: 300000, responseDurationMs: 60000}
+            short: {name: "Быстрая", characterDurationMs: 60000, mainDurationMs: 40000, responseDurationMs: 10000},
+            normal: {name: "Обычная", characterDurationMs: 90000, mainDurationMs: 75000, responseDurationMs: 20000},
+            long: {name: "Длинная", characterDurationMs: 150000, mainDurationMs: 150000, responseDurationMs: 40000}
         };
     }
 
@@ -394,7 +394,7 @@ class CreateGamePanel extends React.Component {
         if (!durationMs)
             return "off";
         const seconds = Math.floor(durationMs / 1000);
-        return seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60}m` : `${seconds}s`;
+        return seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60} мин.` : `${seconds} сек.`;
     }
 
     getPresets() {
@@ -763,12 +763,12 @@ class CreateGamePanel extends React.Component {
                         ))}
                     </div>
                     {!galleryMode ? <div className="timer-settings">
-                        <div className="create-game-subtitle">Timers</div>
+                        <div className="create-game-subtitle">Настройки времени</div>
                         <label className="timer-enabled">
                             <input type="checkbox"
                                    checked={timerSettings.enabled}
                                    onChange={(evt) => this.handleTimerEnabledChange(evt)}/>
-                            Enabled
+                            Включить
                         </label>
                         <div className="timer-presets-list">
                             {Object.keys(this.timerPresets).map((preset) =>
@@ -777,30 +777,33 @@ class CreateGamePanel extends React.Component {
                                     {this.timerPresets[preset].name}
                                 </div>)}
                         </div>
+                        <div className="timer-slider-row">Выбор персонажа:</div>
                         <div className="timer-slider-row">
-                            <div className="timer-slider-label">Character: {this.formatTimerDuration(timerSettings.characterDurationMs)}</div>
+                            <div className="timer-slider-label">{this.formatTimerDuration(timerSettings.characterDurationMs)}</div>
                             <input type="range"
                                    min="0"
-                                   max="900000"
-                                   step="30000"
+                                   max="480000"
+                                   step="5000"
                                    value={timerSettings.characterDurationMs}
                                    onChange={(evt) => this.handleTimerDurationChange("characterDurationMs", evt.target.value)}/>
                         </div>
+                        <div className="timer-slider-row">Основной ход: </div>
                         <div className="timer-slider-row">
-                            <div className="timer-slider-label">Main: {this.formatTimerDuration(timerSettings.mainDurationMs)}</div>
+                            <div className="timer-slider-label">{this.formatTimerDuration(timerSettings.mainDurationMs)}</div>
                             <input type="range"
                                    min="0"
-                                   max="600000"
-                                   step="30000"
+                                   max="480000"
+                                   step="5000"
                                    value={timerSettings.mainDurationMs}
                                    onChange={(evt) => this.handleTimerDurationChange("mainDurationMs", evt.target.value)}/>
                         </div>
+                        <div className="timer-slider-row">Ответное действие:</div>
                         <div className="timer-slider-row">
-                            <div className="timer-slider-label">Response: {this.formatTimerDuration(timerSettings.responseDurationMs)}</div>
+                            <div className="timer-slider-label">{this.formatTimerDuration(timerSettings.responseDurationMs)}</div>
                             <input type="range"
                                    min="0"
                                    max="120000"
-                                   step="5000"
+                                   step="1000"
                                    value={timerSettings.responseDurationMs}
                                    onChange={(evt) => this.handleTimerDurationChange("responseDurationMs", evt.target.value)}/>
                         </div>
