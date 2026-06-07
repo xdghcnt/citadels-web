@@ -832,6 +832,7 @@ class Game extends React.Component {
     componentDidMount() {
         this.gameName = "citadels";
         const initArgs = CommonRoom.roomInit(this);
+        this.initSounds();
         this.socket.on("state", (state) => {
             CommonRoom.processCommonRoom(state, this.state, {
                 maxPlayers: 8,
@@ -839,11 +840,14 @@ class Game extends React.Component {
                 details: "Citadels"
             }, this);
             if (this.state && this.state.currentPlayer !== this.state.userSlot && state.currentPlayer === this.state.userSlot)
-                this.turnSound.play();
+                this.playSound("chime");
+            if (state.sound)
+                this.playSound(state.sound);
             const nextState = Object.assign({}, this.state, {
                 userId: this.userId,
                 userSlot: state.playerSlots.indexOf(this.userId),
-                serverReceivedAt: Date.now()
+                serverReceivedAt: Date.now(),
+                sound: null
             }, state);
             this.resetLocalActionIfStale(nextState);
             this.setState(nextState);
@@ -875,8 +879,6 @@ class Game extends React.Component {
         });
         document.title = `Citadels - ${initArgs.roomId}`;
         this.socket.emit("init", initArgs);
-        this.turnSound = new Audio("/citadels/chime.mp3");
-        this.turnSound.volume = 0.8;
     }
 
     resetLocalActionIfStale(state) {
@@ -917,8 +919,39 @@ class Game extends React.Component {
             inited: false,
             userAction: null,
             cardChosen: [],
-            playerChosen: null
+            playerChosen: null,
+            soundsMuted: localStorage.citadelsSoundsMuted === "true"
         };
+    }
+
+    initSounds() {
+        this.sounds = {};
+    }
+
+    getSound(name) {
+        if (!this.sounds[name]) {
+            this.sounds[name] = new Audio(`/citadels/sounds/${name}.mp3`);
+            this.sounds[name].volume = 0.8;
+        }
+        return this.sounds[name];
+    }
+
+    playSound(name) {
+        if (!name || this.state.soundsMuted)
+            return;
+        const sound = this.getSound(name);
+        sound.currentTime = 0;
+        const playPromise = sound.play();
+        if (playPromise && playPromise.catch)
+            playPromise.catch(() => {});
+    }
+
+    handleToggleSounds() {
+        const soundsMuted = !this.state.soundsMuted;
+        localStorage.citadelsSoundsMuted = soundsMuted ? "true" : "false";
+        if (soundsMuted && this.sounds)
+            Object.values(this.sounds).forEach(sound => sound.pause());
+        this.setState({soundsMuted});
     }
 
     handleSpectatorsClick() {
@@ -1306,7 +1339,7 @@ class Game extends React.Component {
     }
 
     getUniqueDistricts() {
-        return ["secret_vault", "haunted_quarter", "stable", "keep", "memorial", "framework", "arsenal", "observatory", "poor_house", "monument", "basilica", "museum", "ivory_tower", "well_of_wishes", "quarry", "factory", "map_room", "capitol", "necropolis", "imperial_treasury", "forgery", "laboratory", "school_of_magic", "den_of_thieves", "theater", "dragon_gate", "park", "great_wall", "library", "gold_mine"];
+        return ["secret_vault", "stable", "haunted_quarter", "keep", "memorial", "framework", "arsenal", "observatory", "poor_house", "monument", "basilica", "museum", "quarry",  "ivory_tower", "well_of_wishes", "factory", "map_room", "capitol", "necropolis", "imperial_treasury", "forgery", "laboratory", "school_of_magic", "den_of_thieves", "theater", "dragon_gate", "park", "great_wall", "library", "gold_mine"];
     }
 
     render() {
@@ -1701,6 +1734,11 @@ class Game extends React.Component {
                                 ? (<i onClick={() => this.handleClickShowCards()}
                                       className="material-icons settings-button">amp_stories</i>)
                                 : ""}
+                            <i onClick={() => this.handleToggleSounds()}
+                               className="material-icons settings-button"
+                               title={data.soundsMuted ? "Enable sounds" : "Disable sounds"}>
+                                {data.soundsMuted ? "volume_off" : "volume_up"}
+                            </i>
                             <i onClick={() => this.handleClickChangeName()}
                                className="toggle-theme material-icons settings-button">edit</i>
                         </div>
