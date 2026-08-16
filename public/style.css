@@ -132,6 +132,10 @@ h1, h2, h3 {
     min-width: 0;
     overflow: hidden;
     width: 100%;
+    /* Not a containing block: the host controls hang below the name plate and
+       would be cut off by the overflow that keeps long names inside it. They
+       anchor to .profile-head instead, which is positioned and doesn't clip. */
+    position: static;
 }
 
 .profile-name .player-name-text {
@@ -571,10 +575,13 @@ body {
 .profile-name .player:hover .player-host-controls,
 .profile-name .player:focus .player-host-controls {
     position: absolute;
-    width: 100%;
+    left: 0;
+    right: 0;
+    width: auto;
     text-align: center;
     bottom: -20px;
-    z-index: 1;
+    /* Above .profile-head .timer-display, so the timer never hides the controls */
+    z-index: 3;
     background: #ffffffab;
     color: black;
     padding: 3px;
