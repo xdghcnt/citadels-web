@@ -6,52 +6,9 @@ function init(wsServer, path) {
         utils = require('./utils'),
         channel = "citadels",
         testMode = process.argv[2] === "debug",
-        timerPresets = {
-            short: {characterDurationMs: 60000, mainDurationMs: 40000, responseDurationMs: 10000},
-            normal: {characterDurationMs: 90000, mainDurationMs: 75000, responseDurationMs: 20000},
-            long: {characterDurationMs: 150000, mainDurationMs: 150000, responseDurationMs: 40000}
-        },
-        defaultTimerSettings = {
-            enabled: true,
-            preset: "normal",
-            characterDurationMs: timerPresets.normal.characterDurationMs,
-            mainDurationMs: timerPresets.normal.mainDurationMs,
-            responseDurationMs: timerPresets.normal.responseDurationMs
-        },
-        clampDuration = (value, min, max) => {
-            value = Math.floor(Number(value) || 0);
-            if (!value)
-                return 0;
-            return Math.min(max, Math.max(min, value));
-        },
-        normalizeTimerSettings = (settings) => {
-            const preset = settings && settings.preset === "custom"
-                    ? "custom"
-                    : timerPresets[settings && settings.preset] ? settings.preset : "normal",
-                presetSettings = timerPresets[preset] || timerPresets.normal,
-                mainDurationMs = clampDuration(
-                    settings && settings.mainDurationMs !== undefined ? settings.mainDurationMs : presetSettings.mainDurationMs,
-                    30000,
-                    600000
-                ),
-                responseDurationMs = clampDuration(
-                    settings && settings.responseDurationMs !== undefined ? settings.responseDurationMs : presetSettings.responseDurationMs,
-                    10000,
-                    120000
-                ),
-                characterDurationMs = clampDuration(
-                    settings && settings.characterDurationMs !== undefined ? settings.characterDurationMs : presetSettings.characterDurationMs,
-                    30000,
-                    900000
-                );
-            return {
-                enabled: !(settings && settings.enabled === false) && !!(characterDurationMs || mainDurationMs || responseDurationMs),
-                preset,
-                characterDurationMs,
-                mainDurationMs,
-                responseDurationMs
-            };
-        };
+        setupConfig = require("./public/setup"),
+        normalizeTimerSettings = setupConfig.normalizeTimerSettings,
+        defaultTimerSettings = normalizeTimerSettings();
 
     registry.handleAppPage(path, `${__dirname}/public/app.html`);
 
@@ -86,6 +43,12 @@ function init(wsServer, path) {
                 playerDistricts: {},
                 playerCharacter: {},
                 playerScore: {},
+                districtDeckCount: 0,
+                districtDiscardCount: 0,
+                setupDraft: setupConfig.getDefaultSetup(),
+                setupDraftAutomatic: true,
+                setupDraftInvalid: false,
+                setupDraftPreserveCharacters: false,
                 winnerPlayers: []
             };
             if (testMode)
@@ -98,8 +61,12 @@ function init(wsServer, path) {
             const state = {
                 players: {},
                 districtDeck: [],
+                districtDiscard: [],
                 characterDeck: [],
-                characterRoles: {}
+                characterRoles: {},
+                gameRules: setupConfig.normalizeRules(),
+                randomDiscards: [],
+                previousRandomDiscards: []
             };
             this.state = state;
             let timerTimeout = null,
@@ -108,6 +75,10 @@ function init(wsServer, path) {
                 send = (target, event, data) => userRegistry.send(target, event, data),
                 update = (payload) => {
                     room.serverTime = Date.now();
+                    if (room.phase === 0 && room.setupDraftAutomatic)
+                        room.setupDraft = setupConfig.getDefaultSetup(room.playerSlots.filter(user => user !== null).length);
+                    room.districtDeckCount = state.districtDeck.length;
+                    room.districtDiscardCount = state.districtDiscard.length;
                     send(room.onlinePlayers, "state", payload ? Object.assign({}, room, payload) : room);
                 },
                 sendSlot = (slot, event, data) => {
@@ -334,10 +305,17 @@ function init(wsServer, path) {
                         return clearTurnTimer();
                     finishTurn(slot, true, true);
                 },
-                startGame = (districts, timerSettings) => {
+                startGame = (setup) => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
                     if (state.playersCount > 1) {
-                        room.timerSettings = normalizeTimerSettings(timerSettings);
+                        room.timerSettings = normalizeTimerSettings(setup.timer);
+                        room.gameSetup = setup;
+                        room.setupDraft = setup;
+                        room.setupDraftAutomatic = false;
+                        room.setupDraftInvalid = false;
+                        state.gameRules = setup.rules;
+                        state.randomDiscards = [];
+                        state.previousRandomDiscards = [];
                         room.timer = null;
                         room.timersPaused = false;
                         room.targetSlot = null;
@@ -348,22 +326,27 @@ function init(wsServer, path) {
                         room.playerScore = {};
                         room.winnerPlayers = [];
                         room.teamsLocked = true;
-                        state.districtDeck = utils.createDeck(state.playersCount, districts);
+                        state.districtDeck = utils.createDeck(state.playersCount, setup.districts.unique, false, setup.districts.basic);
+                        state.districtDiscard = [];
                         if (room.winnerPlayer != null)
                             utils.shuffle(room.playerSlots);
+                        room.king = getRandomPlayer();
+                        state.firstCrownSlot = room.king;
+                        const occupiedSlots = room.playerSlots.map((user, slot) => user !== null ? slot : null).filter(slot => slot !== null);
+                        const startingHands = utils.dealStartingHands(state.districtDeck, state.playersCount, setup.starting, occupiedSlots.indexOf(room.king));
                         room.playerSlots.forEach((player, slot) => {
                             if (player != null) {
                                 state.players[slot] = {
-                                    hand: state.districtDeck.splice(0, 4)
+                                    hand: startingHands.shift()
                                 };
-                                room.playerHand[slot] = 4;
+                                room.playerHand[slot] = state.players[slot].hand.length;
                                 if (testMode && slot === 0) {
                                     state.players[slot].hand.push(
                                         ...utils.createDeck(state.playersCount, ["necropolis"], true)
                                     );
-                                    room.playerHand[slot] = 0;
+                                    room.playerHand[slot] = state.players[slot].hand.length;
                                 }
-                                room.playerGold[slot] = (slot === 0 && testMode) ? 99 : 2;
+                                room.playerGold[slot] = (slot === 0 && testMode) ? 99 : setupConfig.getStartingResources(setup.starting, slot === state.firstCrownSlot).gold;
                                 room.playerDistricts[slot] = [];
                                 room.playerCharacter[slot] = [];
                                 room.playerScore[slot] = 0;
@@ -371,15 +354,21 @@ function init(wsServer, path) {
                                 delete state.players[slot];
                         });
 
-                        room.king = getRandomPlayer();
                         room.ender = null;
                         room.winnerPlayer = null;
                         room.winnerPlayers = [];
                         room.tax = 0;
-                        state.maxDistricts = state.playersCount < 4 ? 8 : 7;
+                        state.maxDistricts = setupConfig.getCitySize(state.playersCount, setup.rules);
+                        room.citySize = state.maxDistricts;
                         state.wizardPlayer = null
                         newRound();
                     }
+                },
+                randomDiscard = (count, protectCrown) => {
+                    const excluded = state.gameRules.preventRepeatedRandomDiscard ? state.previousRandomDiscards : [];
+                    const cards = utils.takeRandomCharacters(state.characterDeck, count, excluded, protectCrown);
+                    state.randomDiscards.push(...cards);
+                    return cards;
                 },
                 newRound = () => {
                     clearTurnTimer();
@@ -387,12 +376,11 @@ function init(wsServer, path) {
                     state.currentIndCharacter = 0;
                     room.currentCharacter = "0";
                     state.characterDeck = [...room.characterInGame];
+                    state.previousRandomDiscards = state.randomDiscards;
+                    state.randomDiscards = [];
                     let discard = state.playersCount + 1 === room.characterInGame.length || state.playersCount < 4 ? 0 : room.characterInGame.length - 2 - state.playersCount;
-                    room.characterFace = utils.shuffle(state.characterDeck.filter(card => !["4_1", "4_2", "4_3"].includes(card))).splice(0, discard);
-                    state.characterDeck = state.characterDeck.filter(card => !room.characterFace.includes(card));
-
-                    let rnd = Math.floor(Math.random() * state.characterDeck.length);
-                    state.discarded = state.characterDeck.splice(rnd, 1);
+                    room.characterFace = randomDiscard(discard, true);
+                    state.discarded = randomDiscard(1, false);
 
                     Object.keys(state.players).forEach(slot => {
                         state.players[slot].character = [];
@@ -425,8 +413,7 @@ function init(wsServer, path) {
                 },
                 nextChoose = () => {
                     if (state.playersCount === 3 && state.characterDeck.length === 5) {
-                        let rnd = Math.floor(Math.random() * state.characterDeck.length);
-                        state.characterDeck.splice(rnd, 1);
+                        randomDiscard(1, false);
                         return nextChoose();
                     }
                     state.players[room.currentPlayer].action = null;
@@ -618,8 +605,7 @@ function init(wsServer, path) {
                             countPoints(room.currentPlayer);
                             break;
                         case "7_1":
-                            room.playerHand[room.currentPlayer] += 2;
-                            state.players[room.currentPlayer].hand.push(...state.districtDeck.splice(0, 2));
+                            drawIntoHand(room.currentPlayer, 2);
                             room.buildDistricts = 3;
                             countPoints(room.currentPlayer);
                             break;
@@ -734,10 +720,13 @@ function init(wsServer, path) {
                     update();
                     updateState();
                 },
-                shuffleCardsIntoDistrictDeck = (cards) => {
-                    while (cards && cards.length) {
-                        state.districtDeck.splice(Math.floor(Math.random() * (state.districtDeck.length + 1)), 0, cards.shift());
-                    }
+                discardCards = cards => utils.discardDistrictCards(state, cards),
+                drawCards = count => utils.drawDistrictCards(state, count),
+                drawIntoHand = (slot, count) => {
+                    const cards = drawCards(count);
+                    state.players[slot].hand.push(...cards);
+                    room.playerHand[slot] = state.players[slot].hand.length;
+                    return cards.length;
                 },
                 finishPhase3Turn = (slot) => {
                     const player = state.players[slot];
@@ -757,7 +746,7 @@ function init(wsServer, path) {
                         room.targetSlot = null;
                     } else if (player.choose) {
                         if (player.chooseSource === 'districtDeck' || !player.chooseSource)
-                            shuffleCardsIntoDistrictDeck(player.choose);
+                            discardCards(player.choose);
                         player.choose = null;
                         player.chooseSource = null;
                     }
@@ -861,8 +850,7 @@ function init(wsServer, path) {
                             if (!room.playerGold[slot] && include(slot, "poor_house"))
                                 room.playerGold[slot] += 1;
                             if (!state.players[slot].hand.length && include(slot, "park")) {
-                                state.players[slot].hand.push(...state.districtDeck.splice(0, 2));
-                                room.playerHand[slot] += 2;
+                                drawIntoHand(slot, 2);
                             }
                             if (room.currentCharacter === "6_2")
                                 room.playerGold[slot] += state.alchemistCoins;
@@ -879,8 +867,10 @@ function init(wsServer, path) {
                     room.playerScore[slot] = room.playerDistricts[slot].map(card => getDistrictCost(card)).reduce((a, b) => a + b, 0);
                     const decorationsCount = room.playerDistricts[slot].map(card => getDecorationCount(card)).reduce((a, b) => a + b, 0);
                     room.playerScore[slot] += Math.floor(decorationsCount / 2);
-                    if (room.ender == slot) room.playerScore[slot] += 2;
-                    if (getDistrictsCount(slot) >= state.maxDistricts) room.playerScore[slot] += 2;
+                    if (room.ender == slot)
+                        room.playerScore[slot] += state.gameRules.bonuses.firstCity;
+                    else if (getDistrictsCount(slot) >= state.maxDistricts)
+                        room.playerScore[slot] += state.gameRules.bonuses.otherCities;
 
                     room.playerScore[slot] += 3 * include(slot, "dragon_gate");
                     room.playerScore[slot] += room.playerHand[slot] * include(slot, "map_room");
@@ -901,7 +891,7 @@ function init(wsServer, path) {
                                 acc[current]++;
                                 return acc;
                             }, acc);
-                        if (Math.min(...Object.keys(acc).map((type) => acc[type]))) bonusPoints += 3;
+                        if (Math.min(...Object.keys(acc).map((type) => acc[type]))) bonusPoints += state.gameRules.bonuses.allColors;
                         if (include(slot, "ivory_tower") && acc[9] === 1) bonusPoints += 5;
                         bonusPoints += acc[9] * include(slot, "well_of_wishes");
                         if (Math.max(...Object.keys(acc).map((type) => acc[type])) >= 3) bonusPoints += 3 * include(slot, "capitol");
@@ -919,32 +909,6 @@ function init(wsServer, path) {
                 getDecorationCount = (card) => card.decoration === true ? 1 : (card.decoration || 0),
                 getDistrictCost = (card) => card.cost + getDecorationCount(card),
                 getBuildCost = (slot, card) => card.cost - ((include(slot, "factory") && card.kind === 9) ? 1 : 0),
-                isCharactersValid = (characters) => {
-                    if (!([8, 9].includes(characters.length) && characters.every((character, index) => {
-                        const match = character.match(/^([1-9])_([1-3])$/);
-                        return match && +match[1] === (index + 1);
-                    })))
-                        return false;
-                    else {
-                        const
-                            playerCount = room.playerSlots.filter((user) => user !== null).length,
-                            hasNineCharacter = characters.length === 9;
-                        if (playerCount === 2 && hasNineCharacter)
-                            return false;
-                        else if ([3, 8].includes(playerCount) && !hasNineCharacter)
-                            return false;
-                        else if (playerCount === 2 && characters.some(char => char === "4_2"))
-                            return false;
-                        else if (playerCount < 5 && characters.some(char => char === "9_2"))
-                            return false;
-                        return true;
-                    }
-                },
-                isDistrictsValid = (districts) => {
-                    const uniqueDistricts = utils.getUniqueDistricts();
-                    if (districts.length === (new Set(districts)).size && districts.every((districts) => uniqueDistricts.includes(districts)))
-                        return true;
-                },
                 includeHand = (slot, card) => state.players[slot].hand.some(building => building.type === card),
                 getPlayerDistrictIndex = (slot, card) => room.playerDistricts[slot].findIndex((it) => it.type === card),
                 getPlayerDistrict = (slot, card) => room.playerDistricts[slot][getPlayerDistrictIndex(slot, card)],
@@ -1020,7 +984,7 @@ function init(wsServer, path) {
                     const building = room.playerDistricts[slot_d][cardInd];
                     if (building) {
                         if (building.exposition) {
-                            state.districtDeck.push(...building.exposition);
+                            discardCards(building.exposition);
                             delete building.exposition;
                         }
                         if (building.decoration) {
@@ -1029,8 +993,8 @@ function init(wsServer, path) {
                         dropCardDistricts(slot_d, cardInd);
                     }
                 },
-                dropCardHand = (slot, cardInd) => state.districtDeck.push(...state.players[slot].hand.splice(cardInd, 1)),
-                dropCardDistricts = (slot, cardInd) => state.districtDeck.push(...room.playerDistricts[slot].splice(cardInd, 1)),
+                dropCardHand = (slot, cardInd) => discardCards(state.players[slot].hand.splice(cardInd, 1)),
+                dropCardDistricts = (slot, cardInd) => discardCards(room.playerDistricts[slot].splice(cardInd, 1)),
                 getNextReturnSeer = () => room.seerReturnPlayers[room.seerReturnPlayers.indexOf(room.seerReturnSlot) + 1],
                 isNoMagistrateAction = () => state.players[room.currentPlayer].action !== 'magistrate-open',
                 isNoSeerAction = () => state.players[room.currentPlayer].action !== 'seer-return',
@@ -1066,9 +1030,9 @@ function init(wsServer, path) {
                     this.lastInteraction = new Date();
                     try {
                         if (this.userEventHandlers[event])
-                            this.userEventHandlers[event](user, data[0], data[1], data[2], data[3]);
+                            this.userEventHandlers[event](user, ...data);
                         else if (this.slotEventHandlers[event] && ~room.playerSlots.indexOf(user))
-                            this.slotEventHandlers[event](room.playerSlots.indexOf(user), data[0], data[1], data[2], data[3]);
+                            this.slotEventHandlers[event](room.playerSlots.indexOf(user), ...data);
                     } catch (error) {
                         console.error(error);
                         registry.log(error.message);
@@ -1121,9 +1085,9 @@ function init(wsServer, path) {
                                 return moveToResponse();
                             }
                         } else {
-                            if (!state.districtDeck.length) return;
+                            const cardsToTake = drawCards(2 + include(slot, "observatory"));
+                            if (!cardsToTake.length) return;
                             room.tookResource = true;
-                            const cardsToTake = state.districtDeck.splice(0, 2 + include(slot, "observatory"));
                             if (include(slot, "library")) {
                                 state.players[slot].hand.push(...cardsToTake);
                                 room.playerHand[slot] += cardsToTake.length;
@@ -1148,7 +1112,7 @@ function init(wsServer, path) {
                         && ~state.players[slot].choose[cardInd]
                         && !['magistrate-open', 'wizard-card-action', 'scholar-response', 'spy-cards'].includes(state.players[slot].action)) {
                         state.players[slot].hand.push(...state.players[slot].choose.splice(cardInd, 1));
-                        shuffleCardsIntoDistrictDeck(state.players[slot].choose);
+                        discardCards(state.players[slot].choose);
                         room.playerHand[slot] += 1;
                         state.players[slot].chooseSource = null;
                         room.phase = 2;
@@ -1167,8 +1131,7 @@ function init(wsServer, path) {
                         if (!["4_3", "5_3"].includes(room.currentCharacter))
                             room.playerGold[slot] += income;
                         else {
-                            state.players[slot].hand.push(...state.districtDeck.splice(0, income));
-                            room.playerHand[slot] += income;
+                            drawIntoHand(slot, income);
                         }
                         countPoints(slot);
                         update();
@@ -1181,11 +1144,10 @@ function init(wsServer, path) {
                                 .filter(type => type === 5).length
                             + include(slot, "school_of_magic");
                         cards = Math.floor(cards);
-                        if (cards > income || cards < 0) return;
+                        if (!Number.isSafeInteger(cards) || cards > income || cards < 0) return;
                         const coins = income - cards;
                         room.playerGold[slot] += coins;
-                        state.players[slot].hand.push(...state.districtDeck.splice(0, cards));
-                        room.playerHand[slot] += cards;
+                        drawIntoHand(slot, cards);
                         room.incomeAction = false;
                         countPoints(slot);
                         update();
@@ -1361,8 +1323,7 @@ function init(wsServer, path) {
                         const goldTaken = Math.min(room.playerGold[slot_d], spyedCardsCount);
                         room.playerGold[slot_d] -= goldTaken;
                         room.playerGold[slot] += goldTaken;
-                        room.playerHand[slot] += spyedCardsCount;
-                        state.players[slot].hand.push(...state.districtDeck.splice(0, spyedCardsCount));
+                        drawIntoHand(slot, spyedCardsCount);
                         room.playerHand[slot_d] = state.players[slot_d].hand.length;
                         room.phase = 3;
                         room.targetSlot = slot_d;
@@ -1393,7 +1354,7 @@ function init(wsServer, path) {
                             if (!cardInds.length) return state.players[slot].action = 'magician-action';
                             let _cards = cardInds.sort((a, b) => b - a);
                             for (let key in _cards) dropCardHand(slot, _cards[key]);
-                            state.players[slot].hand.push(...state.districtDeck.splice(0, _cards.length));
+                            drawIntoHand(slot, _cards.length);
                             sendStateSlot(slot);
                             update({sound: "mag-wisard-seer-spy-sci-imp"});
                         } else {
@@ -1561,9 +1522,7 @@ function init(wsServer, path) {
                         if (res === 'coins') {
                             room.playerGold[slot] += 4;
                         } else {
-                            if (!state.districtDeck.length) return state.players[slot].action = 'navigator-action';
-                            state.players[slot].hand.push(...state.districtDeck.splice(0, 4));
-                            room.playerHand[slot] += 4;
+                            if (!drawIntoHand(slot, 4)) return state.players[slot].action = 'navigator-action';
                         }
                         countPoints(slot);
                         update({sound: res === "coins" ? "nav-coins" : "nav-cards"});
@@ -1572,7 +1531,13 @@ function init(wsServer, path) {
                 },
                 "scholar-action": (slot) => {
                     if (room.phase === 2 && state.players[slot].action === 'scholar-action') {
-                        const cardsToTake = state.districtDeck.splice(0, 7);
+                        const cardsToTake = drawCards(7);
+                        if (!cardsToTake.length) {
+                            state.players[slot].action = null;
+                            update();
+                            sendStateSlot(slot);
+                            return;
+                        }
                         state.players[slot].choose = cardsToTake;
                         state.players[slot].chooseSource = 'districtDeck';
                         room.phase = 3;
@@ -1584,7 +1549,7 @@ function init(wsServer, path) {
                 "scholar-response": (slot, cardInd) => {
                     if (room.phase === 3 && slot === room.currentPlayer && ~state.players[slot].choose[cardInd] && state.players[slot].action === 'scholar-response') {
                         state.players[slot].hand.push(...state.players[slot].choose.splice(cardInd, 1));
-                        shuffleCardsIntoDistrictDeck(state.players[slot].choose);
+                        discardCards(state.players[slot].choose);
                         room.playerHand[slot] += 1;
                         room.phase = 2;
                         state.players[slot].action = null;
@@ -1696,7 +1661,7 @@ function init(wsServer, path) {
                 "forgery-action": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && isNoMagistrateAction()
                         && include(slot, 'forgery') && room.forgeryAction && room.playerGold[slot] > 1) {
-                        state.players[slot].hand.push(...state.districtDeck.splice(0, 3));
+                        drawIntoHand(slot, 3);
                         room.playerGold[slot] -= 2;
                         room.playerHand[slot] = state.players[slot].hand.length;
                         room.forgeryAction = false;
@@ -1799,13 +1764,56 @@ function init(wsServer, path) {
             this.restoreTurnTimer = restoreTurnTimer;
             this.userEventHandlers = {
                 ...this.eventHandlers,
-                "start-game": (user, characters, districts, presetSelected, timerSettings) => {
-                    if (user === room.hostId && characters && characters.length && isCharactersValid(characters) && isDistrictsValid(districts)) {
-                        room.characterInGame = characters;
-                        if (presetSelected)
-                            room.presetSelected = presetSelected;
-                        startGame(districts, timerSettings);
+                "update-setup": (user, value, preserveCharacters) => {
+                    if (user !== room.hostId || room.phase !== 0)
+                        return;
+                    try {
+                        if (value === null) {
+                            room.setupDraftInvalid = true;
+                        } else {
+                            const setup = setupConfig.normalizeSetup(value);
+                            room.setupDraft = setup;
+                            room.setupDraftAutomatic = false;
+                            room.setupDraftInvalid = false;
+                            room.setupDraftPreserveCharacters = preserveCharacters === true;
+                        }
+                    } catch (error) {
+                        send(user, "setup-draft-error", error.message);
+                        return;
                     }
+                    update();
+                },
+                "start-game": (user, characters, districts, presetSelected, timerSettings, basicCounts, options) => {
+                    let setup;
+                    try {
+                        if (user !== room.hostId)
+                            throw new Error("Начать игру может только владелец комнаты.");
+                        if (room.phase !== 0)
+                            throw new Error("Игра уже началась.");
+                        if (options !== undefined && (!options || typeof options !== "object" || Array.isArray(options)
+                            || Object.keys(options).some(key => !["starting", "rules"].includes(key))))
+                            throw new Error("Неверные параметры начала партии.");
+                        setup = setupConfig.normalizeSetup({
+                            format: setupConfig.FORMAT,
+                            version: setupConfig.VERSION,
+                            districts: {basic: setupConfig.normalizeBasicCounts(basicCounts), unique: districts},
+                            characters,
+                            starting: options && options.starting,
+                            rules: options && options.rules,
+                            // Old clients used the server's timer defaults and clamping.
+                            timer: basicCounts === undefined ? normalizeTimerSettings(timerSettings) : timerSettings,
+                            metadata: {presetId: typeof presetSelected === "string" ? presetSelected : null}
+                        });
+                        const errors = setupConfig.getStartErrors(setup, room.playerSlots.filter(user => user !== null).length);
+                        if (errors.length)
+                            throw new Error(errors.join("\n"));
+                    } catch (error) {
+                        send(user, basicCounts === undefined ? "message" : "setup-error", error.message);
+                        return;
+                    }
+                    room.characterInGame = setup.characters;
+                    room.presetSelected = setup.metadata.presetId;
+                    startGame(setup);
                 },
                 "abort-game": (user) => {
                     if (user === room.hostId)
@@ -1876,6 +1884,18 @@ function init(wsServer, path) {
         setSnapshot(snapshot) {
             Object.assign(this.room, snapshot.room);
             Object.assign(this.state, snapshot.state);
+            this.state.districtDiscard = snapshot.state.districtDiscard || [];
+            this.state.gameRules = setupConfig.normalizeRules(snapshot.state.gameRules || (snapshot.room.gameSetup && snapshot.room.gameSetup.rules));
+            this.state.randomDiscards = snapshot.state.randomDiscards || [];
+            this.state.previousRandomDiscards = snapshot.state.previousRandomDiscards || [];
+            this.room.gameSetup = snapshot.room.gameSetup ? setupConfig.normalizeSetup(snapshot.room.gameSetup) : undefined;
+            this.room.setupDraft = setupConfig.normalizeSetup(snapshot.room.setupDraft || this.room.gameSetup || setupConfig.getDefaultSetup(this.room.playerSlots.filter(user => user !== null).length));
+            this.room.setupDraftAutomatic = snapshot.room.setupDraftAutomatic === undefined ? !snapshot.room.setupDraft && !snapshot.room.gameSetup : snapshot.room.setupDraftAutomatic;
+            this.room.setupDraftInvalid = snapshot.room.setupDraftInvalid === true;
+            this.room.setupDraftPreserveCharacters = snapshot.room.setupDraftPreserveCharacters === true;
+            this.room.districtDeckCount = this.state.districtDeck.length;
+            this.room.districtDiscardCount = this.state.districtDiscard.length;
+            this.room.citySize = this.state.maxDistricts;
             this.room.onlinePlayers = new JSONSet();
             this.room.spectators = new JSONSet();
             this.room.onlinePlayers.clear();
