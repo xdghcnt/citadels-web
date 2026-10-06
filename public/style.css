@@ -1566,10 +1566,14 @@ button.inactive {
 .basic-deck-card.excluded .basic-deck-card-image { filter: grayscale(1); opacity: .6; }
 .basic-deck-card label { cursor: text; }
 .basic-deck-cost { font-size: 14px; color: #555; }
-.basic-deck-counter { display: flex; align-items: stretch; gap: 5px; }
-.basic-deck-counter button { min-width: 36px; min-height: 36px; padding: 3px 8px; }
+.deck-settings > .create-game-subtitle { border-top: 0; }
+.basic-deck-counter { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.basic-deck-counter button { flex: 0 0 36px; width: 36px; height: 36px; margin: 0; padding: 0; display: grid; place-items: center; box-sizing: border-box; }
 .basic-deck-counter input {
     width: 55px;
+    height: 36px;
+    flex: 0 0 55px;
+    margin: 0;
     box-sizing: border-box;
     text-align: center;
     font: inherit;
@@ -1583,7 +1587,7 @@ button.inactive {
 .basic-deck-counter input::-webkit-inner-spin-button,
 .basic-deck-counter input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .basic-deck-counter input[aria-invalid="true"] { border: 2px solid #a32418; }
-.basic-deck-reset { display: block; margin: 10px 0 4px; font-size: 13px; padding: 4px 8px; box-shadow: none; }
+.basic-deck-reset { display: block; margin: 10px 0 4px auto; font-size: 13px; padding: 4px 8px; box-shadow: none; }
 .basic-deck-total { margin: 12px 0 0; font-variant-numeric: tabular-nums; }
 .setup-error { padding: 8px 12px; margin: 10px 0; color: #831e15; background: #fff0e9; border: 1px solid #c47f71; }
 .setup-message { margin: 8px 0; color: #244727; }
@@ -1606,19 +1610,26 @@ button.inactive {
 .character-slot.incompatible { outline: 2px dashed #a33022; outline-offset: 2px; }
 .basic-deck-breakdown { margin-top: 4px; font-size: 14px; color: #555; }
 .starting-settings { margin-top: 16px; }
+.starting-settings .create-game-subtitle { border-top: 1px solid #b0b0b060; }
+.starting-settings > .create-game-subtitle:first-child { border-top: 2px solid #b0b0b0; }
 .starting-settings-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 8px 0; }
 .starting-number { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: space-between; }
 .starting-unique-option { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 14px; }
 .starting-unique-option input { margin: 0; }
 .starting-settings input[type="number"] { width: 90px; padding: 5px; font: inherit; text-align: center; box-sizing: border-box; }
+.setup-number-counter { display: inline-flex; flex: none; align-items: center; gap: 5px; }
+.setup-number-counter button { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; padding: 0; display: grid; place-items: center; box-sizing: border-box; font-size: 14px; line-height: 1; }
+.setup-number-counter input { margin: 0; appearance: textfield; }
+.setup-number-counter input::-webkit-inner-spin-button,
+.setup-number-counter input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .starting-settings input[aria-invalid="true"] { border: 2px solid #a32418; }
 .setup-hint { font-size: 13px; color: #555; margin: 8px 0 14px; }
 .city-settings { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin-top: 12px; }
 .city-settings-block { padding-bottom: 8px; }
-.city-reset { display: block; margin: 8px 0 0 auto; font-size: 12px; padding: 3px 6px; box-shadow: none; }
-.district-pile-counts { flex: none; padding: 6px; background: #f6eedde8; border-radius: 4px; color: #333; box-sizing: border-box; font-size: 11px; }
-.district-pile-counts button { display: flex; flex-wrap: wrap; justify-content: space-around; gap: 4px 8px; width: 100%; margin: 0; padding: 2px; border: 0; background: transparent; box-shadow: none; color: inherit; }
-.district-pile-counts button > span { display: flex; align-items: center; gap: 4px; }
+.starting-settings-reset { display: block; margin: 8px 0 0 auto; font-size: 12px; padding: 3px 6px; box-shadow: none; }
+.district-pile-counts { flex: none; width: 60px; align-self: end; margin-right: 10px; margin-top: 20px; padding: 6px 3px; background: #f6f6dd75; border-radius: 4px; color: #333; box-sizing: border-box; font-size: 11px; }
+.district-pile-counts button { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; color: inherit; }
+.district-pile-counts button > span { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .district-pile-counts .material-icons { font-size: 18px; }
 .district-pile-counts strong { font-size: 16px; font-variant-numeric: tabular-nums; }
 .district-pile-tooltip p { margin: 8px 0 0; font-size: 13px; }
@@ -1628,6 +1639,7 @@ button.inactive {
 .setup-view-entry:nth-child(odd) { background: #ffffff80; }
 .setup-view-entry dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
 .crown-settings-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.random-discard-settings { margin-top: 16px; }
 .random-discard-option { display: flex; align-items: center; justify-content: center; gap: 6px; }
 @media (min-width: 750px) {
     .character-section { --role-width: min(71px, calc((100dvh - 184px) * .103)); top: 36px; bottom: 44px; width: 94px; gap: 8px; }
@@ -1635,7 +1647,6 @@ button.inactive {
     .character-section .cards-list { width: var(--role-width); flex: none; }
     .character-section .token-slot { position: relative; width: 100%; height: calc(var(--role-width) * 1.2113); }
     .character-section .cards-list .character { width: 100%; height: 100%; }
-    .district-pile-counts { width: 92px; }
 
     /* Keep the full card visible while preserving its original proportions. */
     .card-item-zoomed {
@@ -1683,8 +1694,6 @@ button.inactive {
     .character-section .cards-list { flex-wrap: nowrap; }
     .character-section .cards-list > .token-slot { flex: 1; min-width: 0; width: auto; }
     .character-section .cards-list .character { height: 56px; }
-    .district-pile-counts { width: 100%; padding: 3px 8px; }
-    .district-pile-counts button { justify-content: flex-end; gap: 14px; }
 }
 @media (max-width: 600px) {
     .create-game-panel { padding: 6px; }
@@ -1692,7 +1701,7 @@ button.inactive {
     .create-game-title { font-size: 21px; }
     .starting-settings-fields { grid-template-columns: 1fr; }
     .starting-number { flex-direction: row; text-align: left; }
-    .starting-number span { flex: 1; }
+    .starting-number > label { flex: 1; }
     .starting-unique-option { justify-content: flex-end; }
     .advanced-settings-toggle { font-size: 17px; }
 }

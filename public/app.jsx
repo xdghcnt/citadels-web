@@ -322,15 +322,37 @@ class SetupHelp extends React.Component {
     }
 }
 
+function SetupNumberInput({id, value, label, min = 0, max = Number.MAX_SAFE_INTEGER, disabled, invalid, onChange}) {
+    let input;
+    const step = direction => {
+        if (direction < 0) input.stepDown();
+        else input.stepUp();
+        onChange(input.value);
+    };
+    return <span className="setup-number-counter">
+        <button type="button" aria-label={"Уменьшить: " + label} aria-controls={id}
+                disabled={disabled || (value !== "" && value <= min)} onClick={() => step(-1)}>−</button>
+        <input ref={element => input = element} id={id} type="number" min={min} max={max}
+               step="1" inputMode="numeric" value={value} disabled={disabled} aria-invalid={invalid}
+               onChange={event => onChange(event.target.value)}/>
+        <button type="button" aria-label={"Увеличить: " + label} aria-controls={id}
+                disabled={disabled || (value !== "" && value >= max)} onClick={() => step(1)}>+</button>
+    </span>;
+}
+
 class CreateGamePanel extends React.Component {
     constructor(props) {
         super(props);
-        const saved = !props.galleryMode && (props.data.setupDraft || props.data.gameSetup);
+        this.draftStore = CitadelsSetup.createDraftStore(() => window.sessionStorage, props.data.userId);
+        const draft = !props.galleryMode && props.data.phase === 0 && props.data.userId === props.data.hostId
+            ? this.draftStore.read(props.game && props.game.roomId) : null;
+        const saved = !props.galleryMode && (draft ? draft.setup
+            : CitadelsSetup.getDefaultSetup(props.data.playerSlots.filter(slot => slot !== null).length));
         this.state = {
             basicCounts: CitadelsSetup.normalizeBasicCounts(saved ? saved.districts.basic : undefined),
             starting: CitadelsSetup.normalizeStarting(saved ? saved.starting : undefined),
             rules: CitadelsSetup.normalizeRules(saved ? saved.rules : undefined),
-            preserveCharacters: !!saved && props.data.setupDraftPreserveCharacters === true,
+            preserveCharacters: !!draft && draft.preserveCharacters,
             advancedOpen: false,
             basicGroup: 4
         };
@@ -342,16 +364,18 @@ class CreateGamePanel extends React.Component {
             this.state.setupMetadata = saved.metadata;
             this.playerCount = props.data.playerSlots.filter(slot => slot !== null).length;
         }
+        if (draft)
+            this.draftFingerprint = JSON.stringify([draft.setup, draft.preserveCharacters]);
     }
 
     componentDidMount() {
         this.previousBodyOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
-        this.publishSetupDraft();
+        this.saveSetupDraft();
     }
 
     componentDidUpdate() {
-        this.publishSetupDraft();
+        this.saveSetupDraft();
     }
 
     canEditSetup() {
@@ -359,29 +383,20 @@ class CreateGamePanel extends React.Component {
         return !this.unmounted && !this.props.galleryMode && data.phase === 0 && data.userId === data.hostId;
     }
 
-    publishSetupDraft() {
+    saveSetupDraft() {
         if (!this.canEditSetup())
             return;
-        let setup = null;
-        try { setup = this.getSetup(); } catch (error) { /* Keep the last valid shared setup. */ }
+        let setup;
+        try { setup = this.getSetup(); } catch (error) { return; }
         const fingerprint = JSON.stringify([setup, this.state.preserveCharacters]);
         if (fingerprint === this.draftFingerprint)
             return;
-        this.draftFingerprint = fingerprint;
-        clearTimeout(this.draftTimeout);
-        this.pendingDraft = [setup, this.state.preserveCharacters];
-        this.draftTimeout = setTimeout(() => this.flushSetupDraft(), 300);
-    }
-
-    flushSetupDraft() {
-        if (this.pendingDraft && this.canEditSetup())
-            this.props.game.socket.emit("update-setup", ...this.pendingDraft);
-        this.pendingDraft = null;
+        if (this.draftStore.write(this.props.game.roomId, {setup, preserveCharacters: this.state.preserveCharacters}))
+            this.draftFingerprint = fingerprint;
     }
 
     componentWillUnmount() {
-        clearTimeout(this.draftTimeout);
-        this.flushSetupDraft();
+        this.saveSetupDraft();
         document.body.style.overflow = this.previousBodyOverflow;
         this.unmounted = true;
         if (this.importReader && this.importReader.readyState === 1)
@@ -490,6 +505,16 @@ class CreateGamePanel extends React.Component {
         this.setState({[section]: Object.assign({}, this.state[section], {[field]: nested})});
     }
 
+    handleResetStartingSettings() {
+        if (!this.canEditSetup() || this.state.importPending || this.props.data.setupPending)
+            return;
+        const defaults = CitadelsSetup.normalizeRules();
+        this.setState({
+            starting: CitadelsSetup.normalizeStarting(),
+            rules: Object.assign({}, this.state.rules, {citySize: defaults.citySize, bonuses: defaults.bonuses})
+        });
+    }
+
     renderStartingSettings() {
         const busy = this.state.importPending || this.props.data.setupPending;
         const automatic = this.state.rules.citySize === null;
@@ -503,14 +528,15 @@ class CreateGamePanel extends React.Component {
                     ["minUnique", exactUnique ? "Особых кварталов на старте" : "Минимум особых кварталов"],
                     ["gold", "Стартовое золото"]
                 ].map(([key, label]) => <div className="starting-setting" key={key}>
-                    <label className="starting-number" htmlFor={"starting-" + key}>
-                        <span>{label}</span>
-                        <input id={"starting-" + key} type="number" min="0" step="1" inputMode="numeric"
+                    <div className="starting-number">
+                        <label htmlFor={"starting-" + key}>{label}</label>
+                        <SetupNumberInput id={"starting-" + key} label={label}
                                value={this.state.starting[key]} disabled={busy}
-                               aria-invalid={!Number.isSafeInteger(this.state.starting[key]) || this.state.starting[key] < 0
+                               max={key === "minUnique" ? Math.max(0, this.state.starting.handSize - this.state.starting.firstCrownReduction.cards) : undefined}
+                               invalid={!Number.isSafeInteger(this.state.starting[key]) || this.state.starting[key] < 0
                                    || (key === "minUnique" && this.state.starting[key] > this.state.starting.handSize - this.state.starting.firstCrownReduction.cards)}
-                               onChange={event => this.handleSetupNumberChange("starting", key, event.target.value)}/>
-                    </label>
+                               onChange={value => this.handleSetupNumberChange("starting", key, value)}/>
+                    </div>
                     {key === "minUnique" ? <label className="starting-unique-option">
                         <input type="checkbox" checked={exactUnique} disabled={busy}
                                onChange={event => this.setState({starting: Object.assign({}, this.state.starting, {exactUnique: event.target.checked})})}/>
@@ -524,48 +550,43 @@ class CreateGamePanel extends React.Component {
             <div className="create-game-subtitle">Первому владельцу короны уменьшить</div>
             <div className="starting-settings-fields crown-settings-fields">
                 {[["cards", "Число карт на"], ["gold", "Число золотых на"]].map(([key, label]) =>
-                    <label className="starting-number" key={key} htmlFor={"crown-reduction-" + key}>
-                        <span>{label}</span>
-                        <input id={"crown-reduction-" + key} type="number" min="0" step="1" inputMode="numeric"
+                    <div className="starting-number" key={key}>
+                        <label htmlFor={"crown-reduction-" + key}>{label}</label>
+                        <SetupNumberInput id={"crown-reduction-" + key} label={label}
                                value={this.state.starting.firstCrownReduction[key]} disabled={busy}
-                               aria-invalid={!Number.isSafeInteger(this.state.starting.firstCrownReduction[key]) || this.state.starting.firstCrownReduction[key] < 0
+                               max={Math.max(0, key === "cards" ? this.state.starting.handSize - this.state.starting.minUnique : this.state.starting.gold)}
+                               invalid={!Number.isSafeInteger(this.state.starting.firstCrownReduction[key]) || this.state.starting.firstCrownReduction[key] < 0
                                    || (key === "cards" && this.state.starting.firstCrownReduction.cards > this.state.starting.handSize - this.state.starting.minUnique)
                                    || (key === "gold" && this.state.starting.firstCrownReduction.gold > this.state.starting.gold)}
-                               onChange={event => this.handleNestedNumberChange("starting", "firstCrownReduction", key, event.target.value)}/>
-                    </label>)}
+                               onChange={value => this.handleNestedNumberChange("starting", "firstCrownReduction", key, value)}/>
+                    </div>)}
             </div>
             <p className="setup-hint">Только при начале партии. Минимум особых кварталов сохраняется и для владельца короны.</p>
             <div className="city-settings-block">
                 <div className="create-game-subtitle">Завершение города</div>
                 <div className="city-settings">
                     <label htmlFor="city-size">Кварталов для завершения города</label>
-                    <input id="city-size" type="number" min="2" max="10" step="1" inputMode="numeric"
+                    <SetupNumberInput id="city-size" label="Кварталов для завершения города" min={2} max={10}
                            value={citySize} disabled={busy}
-                           aria-invalid={!Number.isInteger(citySize) || citySize < 2 || citySize > 10}
-                           onChange={event => this.handleSetupNumberChange("rules", "citySize", event.target.value)}/>
+                           invalid={!Number.isInteger(citySize) || citySize < 2 || citySize > 10}
+                           onChange={value => this.handleSetupNumberChange("rules", "citySize", value)}/>
                 </div>
                 <p className="setup-hint">{automatic ? "Автоматически: 8 для троих, 7 для остальных составов." : "Заданный размер сохраняется при изменении числа игроков."}</p>
-                <button type="button" className="city-reset" disabled={busy || automatic}
-                        onClick={() => this.setState({rules: Object.assign({}, this.state.rules, {citySize: null})})}>По умолчанию</button>
             </div>
             <div className="create-game-subtitle">Бонусные очки</div>
             <div className="starting-settings-fields">
                 {[["firstCity", "Первому завершившему город"], ["otherCities", "Остальным завершившим город"], ["allColors", "За все пять цветов"]].map(([key, label]) =>
-                    <label className="starting-number" key={key} htmlFor={"bonus-" + key}>
-                        <span>{label}</span>
-                        <input id={"bonus-" + key} type="number" min="0" step="1" inputMode="numeric"
+                    <div className="starting-number" key={key}>
+                        <label htmlFor={"bonus-" + key}>{label}</label>
+                        <SetupNumberInput id={"bonus-" + key} label={label}
                                value={this.state.rules.bonuses[key]} disabled={busy}
-                               aria-invalid={!Number.isSafeInteger(this.state.rules.bonuses[key]) || this.state.rules.bonuses[key] < 0}
-                               onChange={event => this.handleNestedNumberChange("rules", "bonuses", key, event.target.value)}/>
-                    </label>)}
+                               invalid={!Number.isSafeInteger(this.state.rules.bonuses[key]) || this.state.rules.bonuses[key] < 0}
+                               onChange={value => this.handleNestedNumberChange("rules", "bonuses", key, value)}/>
+                    </div>)}
             </div>
-            <p className="setup-hint">Первый бонус — полный, без прибавления бонуса остальных. Ноль отключает бонус.</p>
-            <label className="random-discard-option">
-                <input type="checkbox" disabled={busy} checked={this.state.rules.preventRepeatedRandomDiscard}
-                       onChange={event => this.setState({rules: Object.assign({}, this.state.rules, {preventRepeatedRandomDiscard: event.target.checked})})}/>
-                Не сбрасывать одного персонажа случайно два раунда подряд
-            </label>
-            <p className="setup-hint">Открытый, закрытый и дополнительный случайный сброс для троих. Ручной сброс не ограничен.</p>
+            <button type="button" className="starting-settings-reset" disabled={busy}
+                    title="Сбросить стартовые ресурсы, уменьшения для первой короны, размер города и бонусные очки"
+                    onClick={() => this.handleResetStartingSettings()}>По умолчанию</button>
         </div>;
     }
 
@@ -585,6 +606,14 @@ class CreateGamePanel extends React.Component {
             </div>
             <div id="advanced-settings-content" hidden={!this.state.advancedOpen}>
                 {this.renderBasicDeck(summary)}
+                <div className="random-discard-settings">
+                    <label className="random-discard-option">
+                        <input type="checkbox" disabled={busy} checked={this.state.rules.preventRepeatedRandomDiscard}
+                               onChange={event => this.setState({rules: Object.assign({}, this.state.rules, {preventRepeatedRandomDiscard: event.target.checked})})}/>
+                        Не сбрасывать одного персонажа случайно два раунда подряд
+                    </label>
+                    <p className="setup-hint">Открытый, закрытый и дополнительный случайный сброс для троих. Ручной сброс не ограничен.</p>
+                </div>
                 {this.renderStartingSettings()}
             </div>
             <div className="basic-deck-total" role="status" aria-live="polite">
@@ -1230,9 +1259,10 @@ class SetupViewer extends React.Component {
     }
     render() {
         const {data, game} = this.props;
-        const setup = data.phase !== 0 ? data.gameSetup : data.setupDraft;
+        const isHost = data.userId === data.hostId;
+        const setup = data.gameSetup;
         const players = data.playerSlots.filter(user => user !== null).length;
-        const citySize = data.phase !== 0 && data.citySize ? data.citySize : setup && CitadelsSetup.getCitySize(players, setup.rules);
+        const citySize = data.citySize || (setup && CitadelsSetup.getCitySize(players, setup.rules));
         const summary = setup && CitadelsSetup.getDeckSummary(setup.districts.basic, setup.districts.unique);
         const resources = setup && CitadelsSetup.getStartingResources(setup.starting, true);
         const entry = (label, value) => <div className="setup-view-entry" key={label}><dt>{label}</dt><dd>{value}</dd></div>;
@@ -1243,15 +1273,16 @@ class SetupViewer extends React.Component {
                     <div className="create-game-player-count">Игроков: {players} · Только просмотр</div>
                 </div>
                 <div className="characters-panel">
-                    {!setup ? <p>Сетап этой партии не сохранён в старом формате. Партия продолжает действовать по своим правилам.</p> : <>
-                        {data.phase === 0 ? <p className="setup-hint">Настройки следующей партии. Изменения хозяина обновляются автоматически.</p> : null}
-                        {data.phase === 0 && data.setupDraftInvalid ? <div className="setup-error" role="status">
-                            Хозяин редактирует некорректные значения. Показан последний корректный сетап.
-                        </div> : null}
-                        <div className="create-game-subtitle">Персонажи</div>
-                        <div className="setup-view-cards">
-                            {setup.characters.map(card => <Card key={card} card={card} type="character" game={game} isGallery={true}/>) }
-                        </div>
+                    {!setup ? <p>{data.phase === 0
+                        ? "Настройки будут доступны после начала партии."
+                        : "Сетап этой партии не сохранён в старом формате. Партия продолжает действовать по своим правилам."}</p> : <>
+                        {data.phase === 0 ? <p className="setup-hint">Настройки последней начатой партии.</p> : null}
+                        {isHost ? <>
+                            <div className="create-game-subtitle">Персонажи</div>
+                            <div className="setup-view-cards">
+                                {setup.characters.map(card => <Card key={card} card={card} type="character" game={game} isGallery={true}/>) }
+                            </div>
+                        </> : null}
                         <div className="create-game-subtitle">Особые кварталы</div>
                         <div className="setup-view-cards">
                             {setup.districts.unique.map(id => <Card key={id} card={{type: id}} type="card" game={game} isGallery={true}/>) }
@@ -1275,8 +1306,8 @@ class SetupViewer extends React.Component {
                                     {entry("Карт каждому", setup.starting.handSize)}
                                     {entry(setup.starting.exactUnique ? "Особых — фиксированное число" : "Минимум особых", setup.starting.minUnique)}
                                     {entry("Золота каждому", setup.starting.gold)}
-                                    {entry("Уменьшение карт первой короны", setup.starting.firstCrownReduction.cards)}
-                                    {entry("Уменьшение золота первой короны", setup.starting.firstCrownReduction.gold)}
+                                    {isHost ? entry("Уменьшение карт первой короны", setup.starting.firstCrownReduction.cards) : null}
+                                    {isHost ? entry("Уменьшение золота первой короны", setup.starting.firstCrownReduction.gold) : null}
                                     {entry("Первая корона: карты / золото", resources.handSize + " / " + resources.gold)}
                                 </dl>
                                 <div className="create-game-subtitle">Правила и бонусы</div>
@@ -1329,8 +1360,8 @@ class DistrictPileCounters extends SetupHelp {
                     aria-expanded={this.state.open} aria-describedby={this.state.open ? "district-pile-help" : undefined}
                     onFocus={() => this.show()} onBlur={this.close} onClick={() => this.show()}
                     onKeyDown={event => {if (event.key === "Escape") this.close();}}>
-                <span><i className="material-icons" aria-hidden="true">style</i><strong data-pile="deck">{deck}</strong></span>
-                <span><i className="material-icons" aria-hidden="true">layers_clear</i><strong data-pile="discard">{discard}</strong></span>
+                <span><strong data-pile="deck">{deck}</strong><i className="material-icons" aria-hidden="true">style</i></span>
+                <span><strong data-pile="discard">{discard}</strong><i className="material-icons" aria-hidden="true">layers_clear</i></span>
             </button>
             {this.state.open ? ReactDOM.createPortal(
                 <div id="district-pile-help" role="tooltip" className="setup-help-tooltip district-pile-tooltip"
@@ -1349,6 +1380,9 @@ class Game extends React.Component {
         this.gameName = "citadels";
         const initArgs = CommonRoom.roomInit(this);
         this.initSounds();
+        this.socket.on("game-setup", (gameSetup) => {
+            this.setState({gameSetup});
+        });
         this.socket.on("state", (state) => {
             CommonRoom.processCommonRoom(state, this.state, {
                 maxPlayers: 8,
@@ -1375,9 +1409,6 @@ class Game extends React.Component {
         });
         this.socket.on("setup-error", (message) => {
             this.setState({setupPending: false, setupError: message});
-        });
-        this.socket.on("setup-draft-error", (message) => {
-            this.setState({setupError: message});
         });
         this.socket.on("player-state", (player) => {
             const nextState = Object.assign({}, this.state, {

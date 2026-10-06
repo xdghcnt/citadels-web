@@ -36,6 +36,14 @@ test("shared utilities load in a browser without CommonJS", () => {
     const context = {self: {}};
     vm.runInNewContext(fs.readFileSync(require.resolve("../public/setup"), "utf8"), context);
     assert.equal(context.self.CitadelsSetup.getDeckSummary(undefined, []).total, 54);
+    const storage = new Map();
+    const store = context.self.CitadelsSetup.createDraftStore(() => ({
+        getItem: key => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, value)
+    }), "host");
+    const draft = {setup: context.self.CitadelsSetup.getDefaultSetup(), preserveCharacters: true};
+    assert.equal(store.write("room", draft), true);
+    assert.equal(JSON.stringify(store.read("room")), JSON.stringify(draft));
 });
 test("explicit counts omit cards; undefined retains legacy defaults", () => {
     assert.equal(setup.normalizeBasicCounts().manor, 5);

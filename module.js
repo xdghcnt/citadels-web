@@ -45,10 +45,6 @@ function init(wsServer, path) {
                 playerScore: {},
                 districtDeckCount: 0,
                 districtDiscardCount: 0,
-                setupDraft: setupConfig.getDefaultSetup(),
-                setupDraftAutomatic: true,
-                setupDraftInvalid: false,
-                setupDraftPreserveCharacters: false,
                 winnerPlayers: []
             };
             if (testMode)
@@ -75,12 +71,12 @@ function init(wsServer, path) {
                 send = (target, event, data) => userRegistry.send(target, event, data),
                 update = (payload) => {
                     room.serverTime = Date.now();
-                    if (room.phase === 0 && room.setupDraftAutomatic)
-                        room.setupDraft = setupConfig.getDefaultSetup(room.playerSlots.filter(user => user !== null).length);
                     room.districtDeckCount = state.districtDeck.length;
                     room.districtDiscardCount = state.districtDiscard.length;
-                    send(room.onlinePlayers, "state", payload ? Object.assign({}, room, payload) : room);
+                    const {gameSetup, ...publicRoom} = room;
+                    send(room.onlinePlayers, "state", payload ? Object.assign(publicRoom, payload) : publicRoom);
                 },
+                sendGameSetup = (target) => send(target, "game-setup", room.gameSetup || null),
                 sendSlot = (slot, event, data) => {
                     send(room.playerSlots[slot], event, data);
                 },
@@ -310,9 +306,6 @@ function init(wsServer, path) {
                     if (state.playersCount > 1) {
                         room.timerSettings = normalizeTimerSettings(setup.timer);
                         room.gameSetup = setup;
-                        room.setupDraft = setup;
-                        room.setupDraftAutomatic = false;
-                        room.setupDraftInvalid = false;
                         state.gameRules = setup.rules;
                         state.randomDiscards = [];
                         state.previousRandomDiscards = [];
@@ -361,6 +354,7 @@ function init(wsServer, path) {
                         state.maxDistricts = setupConfig.getCitySize(state.playersCount, setup.rules);
                         room.citySize = state.maxDistricts;
                         state.wizardPlayer = null
+                        sendGameSetup(room.onlinePlayers);
                         newRound();
                     }
                 },
@@ -1016,6 +1010,7 @@ function init(wsServer, path) {
                         room.spectators.add(user);
                     room.onlinePlayers.add(user);
                     room.playerNames[user] = data.userName.substr && data.userName.substr(0, 60);
+                    sendGameSetup(user);
                     update();
                     sendState(user);
                 },
@@ -1764,25 +1759,6 @@ function init(wsServer, path) {
             this.restoreTurnTimer = restoreTurnTimer;
             this.userEventHandlers = {
                 ...this.eventHandlers,
-                "update-setup": (user, value, preserveCharacters) => {
-                    if (user !== room.hostId || room.phase !== 0)
-                        return;
-                    try {
-                        if (value === null) {
-                            room.setupDraftInvalid = true;
-                        } else {
-                            const setup = setupConfig.normalizeSetup(value);
-                            room.setupDraft = setup;
-                            room.setupDraftAutomatic = false;
-                            room.setupDraftInvalid = false;
-                            room.setupDraftPreserveCharacters = preserveCharacters === true;
-                        }
-                    } catch (error) {
-                        send(user, "setup-draft-error", error.message);
-                        return;
-                    }
-                    update();
-                },
                 "start-game": (user, characters, districts, presetSelected, timerSettings, basicCounts, options) => {
                     let setup;
                     try {
@@ -1889,10 +1865,9 @@ function init(wsServer, path) {
             this.state.randomDiscards = snapshot.state.randomDiscards || [];
             this.state.previousRandomDiscards = snapshot.state.previousRandomDiscards || [];
             this.room.gameSetup = snapshot.room.gameSetup ? setupConfig.normalizeSetup(snapshot.room.gameSetup) : undefined;
-            this.room.setupDraft = setupConfig.normalizeSetup(snapshot.room.setupDraft || this.room.gameSetup || setupConfig.getDefaultSetup(this.room.playerSlots.filter(user => user !== null).length));
-            this.room.setupDraftAutomatic = snapshot.room.setupDraftAutomatic === undefined ? !snapshot.room.setupDraft && !snapshot.room.gameSetup : snapshot.room.setupDraftAutomatic;
-            this.room.setupDraftInvalid = snapshot.room.setupDraftInvalid === true;
-            this.room.setupDraftPreserveCharacters = snapshot.room.setupDraftPreserveCharacters === true;
+            // Old server-side form drafts are no longer shared or persisted.
+            for (const key of ["setupDraft", "setupDraftAutomatic", "setupDraftInvalid", "setupDraftPreserveCharacters"])
+                delete this.room[key];
             this.room.districtDeckCount = this.state.districtDeck.length;
             this.room.districtDiscardCount = this.state.districtDiscard.length;
             this.room.citySize = this.state.maxDistricts;

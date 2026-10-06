@@ -487,7 +487,7 @@ test("snapshots without any setup fields preserve the active game and do not inv
         assert.deepEqual(restored.state.districtDeck, saved.state.districtDeck);
         assert.deepEqual(restored.state.districtDiscard, []);
         assert.deepEqual(restored.state.gameRules, setup.normalizeRules());
-        assert.equal(restored.room.setupDraft.starting.gold, 2);
+        assert.equal(restored.room.setupDraft, undefined);
         restored.userEventHandlers["toggle-lock"]("host");
         assert.equal(restored.room.gameSetup, undefined);
         assert.equal(restored.room.districtDeckCount, saved.state.districtDeck.length);
@@ -569,53 +569,74 @@ test("random discard history and custom rules restore privately and reset for a 
     game.clearTurnTimer(); restored.clearTurnTimer();
 });
 
-test("only the host can publish drafts; spectators receive valid settings and warnings without private state", () => {
+test("form drafts are ignored by the server without storing or broadcasting them", () => {
     const {game, messages} = createRoom();
-    game.room.onlinePlayers.add("player-1");
-    game.room.onlinePlayers.add("spectator");
     const value = setup.getDefaultSetup(4);
-    value.starting.firstCrownReduction.cards = 1;
-    value.rules.bonuses.allColors = 6;
-    for (const user of ["player-1", "spectator"]) {
+    for (const user of ["host", "player-1", "spectator"]) {
         const before = JSON.stringify(game.getSnapshot());
         game.userEvent(user, "update-setup", [value, true]);
         assert.equal(JSON.stringify(game.getSnapshot()), before);
     }
-    game.userEvent("host", "update-setup", [value, true]);
-    assert.deepEqual(game.room.setupDraft, value);
-    assert.equal(game.room.setupDraftPreserveCharacters, true);
-    const publicMessage = messages.findLast(message => message.event === "state");
-    assert.ok(publicMessage.target.has("spectator"));
-    assert.deepEqual(publicMessage.data.setupDraft.rules.bonuses, value.rules.bonuses);
-    assert.ok(!("players" in publicMessage.data));
-    const lastValid = JSON.stringify(game.room.setupDraft);
-    game.userEvent("host", "update-setup", [null]);
-    assert.equal(game.room.setupDraftInvalid, true);
-    assert.equal(JSON.stringify(game.room.setupDraft), lastValid);
-    const beforeMalformed = JSON.stringify(game.getSnapshot());
-    game.userEvent("host", "update-setup", [{...value, starting: {minUnique: 1, firstCrownReduction: {cards: 4}}}]);
-    assert.equal(JSON.stringify(game.getSnapshot()), beforeMalformed);
-    assert.equal(messages.at(-1).event, "setup-draft-error");
-    game.userEvent("host", "update-setup", [value]);
-    assert.equal(game.room.setupDraftInvalid, false);
+    assert.equal(messages.length, 0);
+    assert.equal(game.room.setupDraft, undefined);
+});
+
+test("setup is sent only to joining users and once to all participants at each game start", () => {
+    const {game, messages} = createRoom();
+    const join = userId => game.userJoin({userId, userName: userId});
+    join("host"); join("player-1"); join("spectator");
+    assert.deepEqual(messages.filter(message => message.event === "game-setup").map(message => [message.target, message.data]),
+        [["host", null], ["player-1", null], ["spectator", null]]);
+    const value = setup.getDefaultSetup(4);
+    value.rules.bonuses.allColors = 6;
+    messages.length = 0;
     game.userEvent("host", "start-game", [chars, [], null, timer, value.districts.basic, {starting: value.starting, rules: value.rules}]);
-    const active = JSON.stringify(game.getSnapshot());
-    game.userEvent("host", "update-setup", [setup.getDefaultSetup()]);
-    assert.equal(JSON.stringify(game.getSnapshot()), active);
-    assert.equal(game.room.gameSetup.rules.bonuses.allColors, 6);
+    const broadcast = messages.filter(message => message.event === "game-setup");
+    assert.equal(broadcast.length, 1);
+    assert.ok(broadcast[0].target.has("host"));
+    assert.ok(broadcast[0].target.has("player-1"));
+    assert.ok(broadcast[0].target.has("spectator"));
+    assert.equal(broadcast[0].data.rules.bonuses.allColors, 6);
+    assert.ok(!("players" in broadcast[0].data));
+    assert.ok(messages.some(message => message.event === "state"));
+    assert.ok(messages.filter(message => message.event === "state").every(message =>
+        !("gameSetup" in message.data) && !("setupDraft" in message.data)));
+
+    messages.length = 0;
+    game.userEvent("host", "toggle-lock", []);
+    assert.equal(messages.filter(message => message.event === "game-setup").length, 0);
+    game.userLeft("player-1");
+    messages.length = 0;
+    join("player-1"); join("late-spectator");
+    const reconnects = messages.filter(message => message.event === "game-setup");
+    assert.deepEqual(reconnects.map(message => message.target), ["player-1", "late-spectator"]);
+    reconnects.forEach(message => assert.deepEqual(message.data, game.room.gameSetup));
+
+    game.userEvent("host", "abort-game", []);
+    value.rules.bonuses.allColors = 9;
+    messages.length = 0;
+    game.userEvent("host", "start-game", [chars, [], null, timer, value.districts.basic, {starting: value.starting, rules: value.rules}]);
+    assert.equal(messages.filter(message => message.event === "game-setup").length, 1);
+    assert.equal(messages.find(message => message.event === "game-setup").data.rules.bonuses.allColors, 9);
     game.clearTurnTimer();
 });
 
-test("restoring an old completed party does not overwrite its setup draft with standard defaults", () => {
+test("restoring a snapshot drops obsolete form drafts but preserves the last game setup", () => {
     const {game} = playingRoom({starting: {gold: 7}, rules: {citySize: 10}});
     game.userEventHandlers["abort-game"]("host");
     const snapshot = JSON.parse(JSON.stringify(game.getSnapshot()));
-    for (const field of ["setupDraft", "setupDraftAutomatic", "setupDraftInvalid", "setupDraftPreserveCharacters"])
-        delete snapshot.room[field];
-    const restored = createRoom().game;
+    snapshot.room.setupDraft = {malformed: true};
+    snapshot.room.setupDraftAutomatic = false;
+    snapshot.room.setupDraftInvalid = true;
+    snapshot.room.setupDraftPreserveCharacters = true;
+    const {game: restored, messages} = createRoom();
     restored.setSnapshot(snapshot);
-    restored.userEventHandlers["toggle-lock"]("host");
-    assert.equal(restored.room.setupDraft.starting.gold, 7);
-    assert.equal(restored.room.setupDraft.rules.citySize, 10);
+    for (const field of ["setupDraft", "setupDraftAutomatic", "setupDraftInvalid", "setupDraftPreserveCharacters"])
+        assert.ok(!(field in restored.getSnapshot().room));
+    restored.userJoin({userId: "host", userName: "Host"});
+    const message = messages.find(message => message.event === "game-setup");
+    assert.equal(message.data.starting.gold, 7);
+    assert.equal(message.data.rules.citySize, 10);
+    assert.ok(messages.filter(message => message.event === "state").every(message => !("gameSetup" in message.data)));
     game.clearTurnTimer(); restored.clearTurnTimer();
 });

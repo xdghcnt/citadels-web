@@ -359,13 +359,60 @@
         return errors;
     }
 
+    // Keep draft storage in this existing browser entry point: the host caches app.html
+    // until restart, while it serves updated scripts directly from disk.
+    function createDraftStore(getStorage, userId) {
+        const keyFor = roomId => typeof userId === "string" && userId.length
+            && typeof roomId === "string" && roomId.length
+            ? "citadels:setup-draft:v1:" + encodeURIComponent(userId) + ":" + encodeURIComponent(roomId) : null;
+        return {
+            read(roomId) {
+                const key = keyFor(roomId);
+                if (!key) return null;
+                let storage;
+                try {
+                    storage = getStorage();
+                    const text = storage.getItem(key);
+                    if (text === null) return null;
+                    if (text.length > MAX_FILE_SIZE + 512) throw new Error("Draft too large");
+                    const draft = JSON.parse(text);
+                    if (!draft || draft.version !== 1
+                        || typeof draft.preserveCharacters !== "boolean")
+                        throw new Error("Invalid draft");
+                    return {
+                        setup: normalizeSetup(draft.setup),
+                        preserveCharacters: draft.preserveCharacters
+                    };
+                } catch (error) {
+                    try { if (storage) storage.removeItem(key); } catch (ignored) {}
+                    return null;
+                }
+            },
+            write(roomId, draft) {
+                const key = keyFor(roomId);
+                if (!key) return false;
+                try {
+                    const value = {
+                        version: 1,
+                        setup: normalizeSetup(draft.setup),
+                        preserveCharacters: draft.preserveCharacters === true
+                    };
+                    getStorage().setItem(key, JSON.stringify(value));
+                    return true;
+                } catch (error) {
+                    return false;
+                }
+            }
+        };
+    }
+
     return {
         FORMAT, VERSION, MAX_COPIES, MAX_FILE_SIZE,
         districts, basicIds, uniqueIds, groups, timerPresets, timerLimits,
         getDefaultBasicCounts, normalizeBasicCounts, normalizeUniqueDistricts,
         normalizeCharacters, getCharacterPlayerErrors, characterRequirements,
         normalizeTimerSettings, normalizeStarting, normalizeRules, normalizeSetup,
-        getStartingResources, getStartingRequirements,
+        getStartingResources, getStartingRequirements, createDraftStore,
         parseSetup, serializeSetup, getDefaultSetup, getDeckSummary, getCitySize, getStartErrors
     };
 }));

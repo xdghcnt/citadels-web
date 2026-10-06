@@ -6,13 +6,15 @@ const port = Number(process.env.PORT || 3002);
 const origin = process.env.ORIGIN || `http://localhost:${port}`;
 const appDir = fs.mkdtempSync(path.join(os.tmpdir(), "citadels-ui-host-"));
 process.chdir(appDir);
-const Server = require("../../meme-police/node_modules/ws-server-engine");
+const requireFromHost = require("node:module").createRequire(path.resolve(__dirname, "../../meme-police/package.json"));
+const Server = requireFromHost("ws-server-engine");
 const server = new Server("ui-test-local-key", {
     port, origin, appDir, timeZoneOffset: 3,
     rateLimit: {time: 1, amount: 100, blockDuration: 1},
     maxConnections: 20, maxRoomsPerIP: 10, maxUsersPerRoom: 25,
     maxPayload: 10000, dumpInterval: null, pingInterval: 900000,
-    inactivityTimeout: false, updatesVersion: 1
+    // Fresh browser profiles may load shared CDN scripts longer than the default 15s token TTL.
+    sessionTTL: 60000, inactivityTimeout: false, updatesVersion: 1
 });
 server.users.restoreManagedRooms().then(() => {
     require("../module")(server, "/bg/citadels", "");
