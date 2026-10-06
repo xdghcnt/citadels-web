@@ -1259,7 +1259,6 @@ class SetupViewer extends React.Component {
     }
     render() {
         const {data, game} = this.props;
-        const isHost = data.userId === data.hostId;
         const setup = data.gameSetup;
         const players = data.playerSlots.filter(user => user !== null).length;
         const citySize = data.citySize || (setup && CitadelsSetup.getCitySize(players, setup.rules));
@@ -1277,12 +1276,6 @@ class SetupViewer extends React.Component {
                         ? "Настройки будут доступны после начала партии."
                         : "Сетап этой партии не сохранён в старом формате. Партия продолжает действовать по своим правилам."}</p> : <>
                         {data.phase === 0 ? <p className="setup-hint">Настройки последней начатой партии.</p> : null}
-                        {isHost ? <>
-                            <div className="create-game-subtitle">Персонажи</div>
-                            <div className="setup-view-cards">
-                                {setup.characters.map(card => <Card key={card} card={card} type="character" game={game} isGallery={true}/>) }
-                            </div>
-                        </> : null}
                         <div className="create-game-subtitle">Особые кварталы</div>
                         <div className="setup-view-cards">
                             {setup.districts.unique.map(id => <Card key={id} card={{type: id}} type="card" game={game} isGallery={true}/>) }
@@ -1306,8 +1299,6 @@ class SetupViewer extends React.Component {
                                     {entry("Карт каждому", setup.starting.handSize)}
                                     {entry(setup.starting.exactUnique ? "Особых — фиксированное число" : "Минимум особых", setup.starting.minUnique)}
                                     {entry("Золота каждому", setup.starting.gold)}
-                                    {isHost ? entry("Уменьшение карт первой короны", setup.starting.firstCrownReduction.cards) : null}
-                                    {isHost ? entry("Уменьшение золота первой короны", setup.starting.firstCrownReduction.gold) : null}
                                     {entry("Первая корона: карты / золото", resources.handSize + " / " + resources.gold)}
                                 </dl>
                                 <div className="create-game-subtitle">Правила и бонусы</div>

@@ -46,6 +46,21 @@ module.exports = async function (page) {
         if (await advanced.isVisible()) await advanced.click();
         assert(await client.getByRole("dialog").locator("input, select, textarea").count() === 0, "В просмотре появились поля редактирования");
         assert(await client.getByRole("button", {name: /Импорт|Экспорт/}).count() === 0, "Импорт или экспорт доступен зрителю");
+        await checkCompactViewer(client);
+    }
+    async function checkCompactViewer(client) {
+        const dialog = client.getByRole("dialog", {name: "Сетап партии"});
+        const characters = dialog.locator(".character.card-item");
+        if (await characters.count()) {
+            await dialog.screenshot({path: "setup-viewer-failure.png"});
+            const sizes = await characters.evaluateAll(elements => elements.map(element => {
+                const {width, height} = element.getBoundingClientRect();
+                return {width, height};
+            }));
+            throw new Error("В просмотре остались карточки персонажей: " + JSON.stringify(sizes));
+        }
+        for (const label of ["Персонажи", "Уменьшение карт первой короны", "Уменьшение золота первой короны"])
+            assert(await dialog.getByText(label, {exact: true}).count() === 0, "В просмотре осталось поле: " + label);
     }
     async function entry(client, label, expected) {
         const row = client.locator(".setup-view-entry").filter({has: client.locator("dt", {hasText: label})});
@@ -152,7 +167,14 @@ module.exports = async function (page) {
             assert(specials === 1, "В стартовой руке не ровно один особый квартал");
             await checkPiles(client, 60, 0);
         }
-        results.push("CASE 1 PASS — crown validation, JSON round trip, resources and conserved deck");
+        await viewer(host);
+        await entry(host, "Первая корона: карты / золото", "1 / 0");
+        await host.getByRole("dialog").screenshot({path: "setup-viewer-host.png"});
+        await host.setViewportSize({width: 390, height: 844});
+        await checkCompactViewer(host);
+        await host.getByRole("dialog").screenshot({path: "setup-viewer-host-mobile.png"});
+        await host.getByRole("button", {name: "Закрыть", exact: true}).click();
+        results.push("CASE 1 PASS — crown validation, JSON round trip, resources, conserved deck and host viewer");
 
         // CASE 2: the cached legacy HTML needs no extra script; drafts survive F5.
         const room2 = baseUrl + "/bg/citadels#ui-view-" + Date.now();
@@ -198,11 +220,7 @@ module.exports = async function (page) {
             await client.getByRole("button", {name: /Расширенные настройки/}).click();
             await entry(client, "За все пять цветов", "9");
             await entry(client, "Первая корона: карты / золото", "3 / 2");
-            const dialog = client.getByRole("dialog", {name: "Сетап партии"});
-            assert(await dialog.getByText("Персонажи", {exact: true}).count() === 0, "Нехосту показан блок персонажей");
-            assert(await dialog.locator(".character.card-item").count() === 0, "Нехосту показаны карты персонажей");
-            for (const label of ["Уменьшение карт первой короны", "Уменьшение золота первой короны"])
-                assert(await dialog.getByText(label, {exact: true}).count() === 0, "Нехосту показано поле: " + label);
+            await checkCompactViewer(client);
             await client.getByRole("button", {name: "Закрыть", exact: true}).click();
             await checkPiles(client, 58, 0);
         }
