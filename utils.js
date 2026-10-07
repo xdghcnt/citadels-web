@@ -1,91 +1,87 @@
-const districts = {
-
-    manor: {type: 4, cost: 3, quantity: 5},
-    castle: {type: 4, cost: 4, quantity: 4},
-    palace: {type: 4, cost: 5, quantity: 3},
-
-    tavern: {type: 6, cost: 1, quantity: 5},
-    market: {type: 6, cost: 2, quantity: 4},
-    trading_post: {type: 6, cost: 2, quantity: 3},
-    docks: {type: 6, cost: 3, quantity: 3},
-    harbor: {type: 6, cost: 4, quantity: 3},
-    town_hall: {type: 6, cost: 5, quantity: 2},
-
-    temple: {type: 5, cost: 1, quantity: 3},
-    church: {type: 5, cost: 2, quantity: 3},
-    monastery: {type: 5, cost: 3, quantity: 3},
-    cathedral: {type: 5, cost: 5, quantity: 2},
-
-    watchtower: {type: 8, cost: 1, quantity: 3},
-    prison: {type: 8, cost: 2, quantity: 3},
-    barracks: {type: 8, cost: 3, quantity: 3},
-    fortress: {type: 8, cost: 5, quantity: 2},
-
-    secret_vault: {type: 9, cost: 0, quantity: 1},
-    stable: {type: 9, cost: 2, quantity: 1},
-    haunted_quarter: {type: 9, cost: 3, quantity: 1},
-    keep: {type: 9, cost: 3, quantity: 1},
-    memorial: {type: 9, cost: 3, quantity: 1},
-    framework: {type: 9, cost: 3, quantity: 1},
-    arsenal: {type: 9, cost: 3, quantity: 1},
-    observatory: {type: 9, cost: 4, quantity: 1},
-    poor_house: {type: 9, cost: 4, quantity: 1},
-    monument: {type: 9, cost: 4, quantity: 1},
-    basilica: {type: 9, cost: 4, quantity: 1},
-    museum: {type: 9, cost: 4, quantity: 1},
-    quarry: {type: 9, cost: 4, quantity: 1},
-    ivory_tower: {type: 9, cost: 5, quantity: 1},
-    well_of_wishes: {type: 9, cost: 5, quantity: 1},
-    factory: {type: 9, cost: 5, quantity: 1},
-    map_room: {type: 9, cost: 5, quantity: 1},
-    capitol: {type: 9, cost: 5, quantity: 1},
-    necropolis: {type: 9, cost: 5, quantity: 1},
-    imperial_treasury: {type: 9, cost: 5, quantity: 1},
-    forgery: {type: 9, cost: 5, quantity: 1},
-    laboratory: {type: 9, cost: 6, quantity: 1},
-    school_of_magic: {type: 9, cost: 6, quantity: 1},
-    den_of_thieves: {type: 9, cost: 6, quantity: 1},
-    theater: {type: 9, cost: 6, quantity: 1},
-    dragon_gate: {type: 9, cost: 6, quantity: 1},
-    park: {type: 9, cost: 6, quantity: 1},
-    great_wall: {type: 9, cost: 6, quantity: 1},
-    library: {type: 9, cost: 6, quantity: 1},
-    gold_mine: {type: 9, cost: 6, quantity: 1}
-};
+const setup = require("./public/setup");
+const districts = setup.districts;
 
 const shuffle = array => {
     for (let i = array.length - 1; i > 0; i--) {
         let j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
-    return array
+    return array;
 };
 
-const createDeck = (players, districtsFilter, onlyFilter) => {
-    const deck = Array();
-    let deck9 = Array();
-    for (let key in districts) {
-        for (let i = 0; i < districts[key].quantity; i++)
-            if ((districts[key].type !== 9 && !onlyFilter) || districtsFilter.includes(key))
-                (districts[key].type === 9 ? deck9 : deck).push({
-                    type: key,
-                    cost: districts[key].cost,
-                    kind: districts[key].type
-                });
+const createDeck = (players, districtsFilter, onlyFilter, basicCounts) => {
+    const selected = new Set(setup.normalizeUniqueDistricts(districtsFilter, players));
+    const counts = setup.normalizeBasicCounts(onlyFilter ? {} : basicCounts);
+    const deck = [];
+    Object.keys(districts).forEach(key => {
+        const district = districts[key];
+        const quantity = district.type === 9 ? Number(selected.has(key)) : counts[key];
+        for (let i = 0; i < quantity; i++)
+            deck.push({type: key, cost: district.cost, kind: district.type});
+    });
+    return shuffle(deck);
+};
+
+const getUniqueDistricts = () => setup.uniqueIds.slice();
+
+// The supplied arrays own the cards; transfers consume them, preserving identity.
+const discardDistrictCards = (state, cards) => {
+    state.districtDiscard.push(...cards.splice(0));
+};
+
+const drawDistrictCards = (state, count) => {
+    if (!Number.isSafeInteger(count) || count < 0)
+        throw new Error("Неверное количество карт для добора.");
+    const drawn = [];
+    while (drawn.length < count) {
+        if (!state.districtDeck.length) {
+            if (!state.districtDiscard.length) break;
+            state.districtDeck.push(...shuffle(state.districtDiscard.splice(0)));
+        }
+        drawn.push(...state.districtDeck.splice(0, count - drawn.length));
     }
-    //Пока что театр не будет работать для 2 и 3 игроков
-    if (players < 4) deck9 = deck9.filter(card => card.type !== "theater");
-    shuffle(deck9).splice(14);
-    return shuffle([...deck, ...deck9]);
+    return drawn;
 };
 
-const getUniqueDistricts = () => {
-    return Object.keys(districts).filter((district) => districts[district].type === 9);
+const dealStartingHands = (deck, players, starting, firstCrownIndex = 0) => {
+    starting = setup.normalizeStarting(starting);
+    const {handSize, minUnique, exactUnique, firstCrownReduction} = starting;
+    if (!Number.isInteger(players) || players < 2 || players > 8)
+        throw new Error("Для раздачи нужно от 2 до 8 игроков.");
+    if (!Number.isInteger(firstCrownIndex) || firstCrownIndex < 0 || firstCrownIndex >= players)
+        throw new Error("Неверный индекс первого владельца короны.");
+    const required = setup.getStartingRequirements(starting, players);
+    const specials = deck.filter(card => card.kind === 9);
+    if (required.cards > deck.length || required.unique > specials.length)
+        throw new Error("Недостаточно карт для стартовой раздачи.");
+    if (exactUnique && required.basic > deck.length - specials.length)
+        throw new Error("Недостаточно базовых кварталов для фиксированного числа особых.");
+    shuffle(specials);
+    const hands = Array.from({length: players}, () => specials.splice(0, minUnique));
+    const reserved = new Set(hands.flat());
+    const remaining = deck.filter(card => !reserved.has(card) && (!exactUnique || card.kind !== 9));
+    hands.forEach((hand, index) => {
+        const size = handSize - (index === firstCrownIndex ? firstCrownReduction.cards : 0);
+        hand.push(...remaining.splice(0, size - minUnique));
+        hand.forEach(card => reserved.add(card));
+        shuffle(hand);
+    });
+    for (let i = deck.length - 1; i >= 0; i--)
+        if (reserved.has(deck[i])) deck.splice(i, 1);
+    return hands;
 };
 
-module.exports = {
-    districts,
-    shuffle,
-    createDeck,
-    getUniqueDistricts
+// Only server-generated discards belong here; manual duel discards stay unrestricted.
+const takeRandomCharacters = (deck, count, excluded = [], protectCrown = false) => {
+    if (!Number.isSafeInteger(count) || count < 0)
+        throw new Error("Неверное количество случайно сбрасываемых персонажей.");
+    const candidates = deck.filter(id => !excluded.includes(id) && (!protectCrown || !["4_1", "4_2", "4_3"].includes(id)));
+    if (candidates.length < count)
+        throw new Error("Недостаточно персонажей для случайного сброса без повторений.");
+    const selected = shuffle(candidates).slice(0, count);
+    selected.forEach(id => deck.splice(deck.indexOf(id), 1));
+    return selected;
 };
+
+module.exports = {districts, shuffle, createDeck, getUniqueDistricts,
+    discardDistrictCards, drawDistrictCards, dealStartingHands, takeRandomCharacters};

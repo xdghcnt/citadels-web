@@ -922,7 +922,7 @@ button {
     }
 
     .create-game-panel-modal {
-        padding-top: 39px !important;
+        padding-top: 12px;
         box-sizing: border-box;
     }
 }
@@ -972,16 +972,22 @@ button {
     align-items: center;
     justify-content: center;
     user-select: none;
-    z-index: 2;
+    z-index: 10;
+    padding: 12px;
+    box-sizing: border-box;
+    height: 100dvh;
 }
 
 .create-game-panel-modal {
-    width: 980px;
-    background: #ffffffab;
-    max-width: 100%;
+    width: min(1040px, 100%);
+    background: #f2efeadf;
+    box-sizing: border-box;
+    min-width: 0;
     text-align: center;
-    padding: 20px;
-    overflow: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     max-height: 100%;
 }
 
@@ -1494,144 +1500,210 @@ button.inactive {
     background: #f1f1f1cf;
 }
 
-/* дополнительная вложенность, чтобы не пересекаться
-с уже существующими медиа запросами */
+/* Game setup: advanced settings and portable setup files. */
+.advanced-settings { margin-top: 16px; padding-bottom: 12px; border-top: 2px solid #b0b0b0; }
+.advanced-settings-heading { padding: 12px 38px; text-align: center; }
+.advanced-settings-anchor { display: inline-block; position: relative; max-width: 100%; }
+.advanced-settings-toggle { position: relative; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; font: inherit; font-size: 18px; line-height: 1.3; }
+.advanced-settings-chevron { position: absolute; right: calc(100% + 6px); top: 0; }
+.advanced-settings-anchor .setup-help-anchor { position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
+.deck-settings { padding-top: 4px; }
+.setup-file-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+.setup-file-actions button { margin: 0; font-size: 13px; padding: 4px 8px; box-shadow: none; }
+.setup-file-actions input[hidden] { display: none; }
+.setup-help-anchor button { margin: 0; background: transparent; border: 0; box-shadow: none; padding: 8px; }
+.setup-help-tooltip {
+    position: fixed;
+    display: block;
+    z-index: 100;
+    box-sizing: border-box;
+    width: min(280px, calc(100vw - 16px));
+    padding: 10px 12px;
+    border: 1px solid #af974e;
+    border-radius: 4px;
+    background: #fff5d5;
+    color: #282010;
+    box-shadow: 0 2px 8px #0003;
+    font-size: 15px;
+    line-height: 1.35;
+    pointer-events: none;
+}
+.basic-deck-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin: 16px 0 10px;
+}
+.basic-deck-tab {
+    padding: 10px 6px;
+    color: #222;
+    border: 1px solid #777;
+    box-shadow: none;
+}
+.basic-deck-tab span { font-variant-numeric: tabular-nums; margin-left: 5px; }
+.basic-deck-tab[aria-selected="true"] { outline: 2px solid #333; outline-offset: -3px; font-weight: bold; }
+.basic-deck-tab.district-kind-4 { background: #f7df99; }
+.basic-deck-tab.district-kind-5 { background: #c0d8ef; }
+.basic-deck-tab.district-kind-6 { background: #c7dfb4; }
+.basic-deck-tab.district-kind-8 { background: #e9bdb5; }
+.basic-deck-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    padding: 16px 8px;
+    background: #ffffffb8;
+}
+.basic-deck-card { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
+.basic-deck-card-image { height: 200px; margin-bottom: 4px; }
+.basic-deck-card-image .card-item { width: 124px; height: 200px; margin: 0; }
+.basic-deck-card.excluded .basic-deck-card-image { filter: grayscale(1); opacity: .6; }
+.basic-deck-card label { cursor: text; }
+.basic-deck-cost { font-size: 14px; color: #555; }
+.deck-settings > .create-game-subtitle { border-top: 0; }
+.basic-deck-counter { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.basic-deck-counter button { flex: 0 0 36px; width: 36px; height: 36px; margin: 0; padding: 0; display: grid; place-items: center; box-sizing: border-box; }
+.basic-deck-counter input {
+    width: 55px;
+    height: 36px;
+    flex: 0 0 55px;
+    margin: 0;
+    box-sizing: border-box;
+    text-align: center;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    color: #222;
+    background: white;
+    border: 1px solid #888;
+    user-select: text;
+    -moz-appearance: textfield;
+}
+.basic-deck-counter input::-webkit-inner-spin-button,
+.basic-deck-counter input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.basic-deck-counter input[aria-invalid="true"] { border: 2px solid #a32418; }
+.basic-deck-reset { display: block; margin: 10px 0 4px auto; font-size: 13px; padding: 4px 8px; box-shadow: none; }
+.basic-deck-total { margin: 12px 0 0; font-variant-numeric: tabular-nums; }
+.setup-error { padding: 8px 12px; margin: 10px 0; color: #831e15; background: #fff0e9; border: 1px solid #c47f71; }
+.setup-message { margin: 8px 0; color: #244727; }
+.create-game-panel button:disabled { opacity: .55; cursor: not-allowed; }
+.advanced-settings button:focus-visible, .advanced-settings input:focus-visible { outline: 2px solid #245696; outline-offset: 2px; }
+@media (max-width: 600px) {
+    .basic-deck-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 8px; }
+    .basic-deck-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.create-game-header { flex: 0 0 auto; padding-bottom: 10px; }
+.create-game-title { margin: 0; line-height: 1.2; }
+.create-game-player-count { font-size: 14px; margin-top: 4px; color: #555; }
+.create-game-panel-modal > .characters-panel { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; padding: 0 8px 8px; overscroll-behavior: contain; }
+.setup-footer { flex: 0 0 auto; border-top: 1px solid #bbb; padding-top: 8px; }
+.setup-footer .setup-error { max-height: 20dvh; overflow: auto; margin: 0 0 8px; font-size: 14px; }
+.setup-footer .create-game-buttons { margin-top: 0; }
+.create-game-panel .preset-description { height: auto; min-height: 50px; }
+.character-slot.selected .character.card-item { opacity: 1; }
+.character-slot.incompatible { outline: 2px dashed #a33022; outline-offset: 2px; }
+.basic-deck-breakdown { margin-top: 4px; font-size: 14px; color: #555; }
+.starting-settings { margin-top: 16px; }
+.starting-settings .create-game-subtitle { border-top: 1px solid #b0b0b060; }
+.starting-settings > .create-game-subtitle:first-child { border-top: 2px solid #b0b0b0; }
+.starting-settings-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 8px 0; }
+.starting-number { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: space-between; }
+.starting-unique-option { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 14px; }
+.starting-unique-option input { margin: 0; }
+.starting-settings input[type="number"] { width: 90px; padding: 5px; font: inherit; text-align: center; box-sizing: border-box; }
+.setup-number-counter { display: inline-flex; flex: none; align-items: center; gap: 5px; }
+.setup-number-counter button { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; padding: 0; display: grid; place-items: center; box-sizing: border-box; font-size: 14px; line-height: 1; }
+.setup-number-counter input { margin: 0; appearance: textfield; }
+.setup-number-counter input::-webkit-inner-spin-button,
+.setup-number-counter input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.starting-settings input[aria-invalid="true"] { border: 2px solid #a32418; }
+.setup-hint { font-size: 13px; color: #555; margin: 8px 0 14px; }
+.city-settings { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin-top: 12px; }
+.city-settings-block { padding-bottom: 8px; }
+.starting-settings-reset { display: block; margin: 8px 0 0 auto; font-size: 12px; padding: 3px 6px; box-shadow: none; }
+.district-pile-counts { flex: none; width: 60px; align-self: end; margin-right: 10px; margin-top: 20px; padding: 6px 3px; background: #f6f6dd75; border-radius: 4px; color: #333; box-sizing: border-box; font-size: 11px; }
+.district-pile-counts button { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; color: inherit; }
+.district-pile-counts button > span { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.district-pile-counts .material-icons { font-size: 18px; }
+.district-pile-counts strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.district-pile-tooltip p { margin: 8px 0 0; font-size: 13px; }
+.setup-view-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 8px 0 14px; }
+.setup-view-values { max-width: 720px; margin: 10px auto 18px; }
+.setup-view-entry { display: flex; justify-content: space-between; gap: 16px; padding: 5px 8px; text-align: left; }
+.setup-view-entry:nth-child(odd) { background: #ffffff80; }
+.setup-view-entry dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.crown-settings-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.random-discard-settings { margin-top: 16px; }
+.random-discard-option { display: flex; align-items: center; justify-content: center; gap: 6px; }
 @media (min-width: 750px) {
-    /* высота 842px это 774px блока с 9 ролями, 32px блока наблюдателей
-    и 36px блока с настройками игры. Срабатывание на такой высоте
-    вьюпорта позволяет сделать так, чтобы эти блоки друг на друга
-    не наслаивались */
-    @media (max-height: 842px) {
-        .character-section.characters-count-9 {
-            width: 9vh;
-        }
-        /* сдвигает блок с наблюдателями и с управлением игрой,
-        чтоб они не наслаивались на блок ролей */
-        .characters-count-9 ~ .spectators-section,
-        .characters-count-9 ~ .host-controls {
-            right: 9vh;
-        }
-        .character-section .status.robbed,
-        .character-section .status.blackmailed,
-        .character-section .status.true-blackmailed,
-        .character-section .status.magistrated,
-        .character-section .status.true-magistrated,
-        .character-section .status.witched,
-        .character-section .status.assassined {
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            height: auto;
-        }
-        .status svg {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            max-width: 80%;
-            width: auto;
-            height: auto;
-        }
+    .character-section { --role-width: min(71px, calc((100dvh - 184px) * .103)); top: 36px; bottom: 44px; width: 94px; gap: 8px; }
+    .character-section.characters-count-9 { --role-width: min(71px, calc((100dvh - 184px) * .0917)); }
+    .character-section .cards-list { width: var(--role-width); flex: none; }
+    .character-section .token-slot { position: relative; width: 100%; height: calc(var(--role-width) * 1.2113); }
+    .character-section .cards-list .character { width: 100%; height: 100%; }
 
-        .status.two-icons .assassined-icon,
-        .status.two-icons .robbed-icon,
-        .status.two-icons .blackmailed-icon,
-        .status.two-icons .true-blackmailed-icon,
-        .status.two-icons .magistrated-icon,
-        .status.two-icons .true-magistrated-icon {
-            position: static;
-        }
-        .status .witched-icon svg,
-        .status .magistrated-icon svg,
-        .status .true-magistrated-icon svg {
-            width: 70%;
-            height: auto;
-            margin: 0;
-        }
-        .status.two-icons .robbed-icon svg,
-        .status.two-icons .blackmailed-icon svg,
-        .status.two-icons .true-blackmailed-icon svg {
-            width: 50%;
-            top: 30%;
-            left: 30%;
-        }
-        .status.two-icons .magistrated-icon svg,
-        .status.two-icons .true-magistrated-icon svg {
-            width: 50%;
-            top: 70%;
-            left: 70%;
-        }
-        /* дополнительное условие, чтобы не дублировать стили
-        при высоте вьюпорта менее 756px */
-        @media (min-height: 756px) {
-            .characters-count-9 .token-slot {
-                flex-grow: 1;
-                width: 100%;
-            }
-            .characters-count-9 .cards-list {
-                position: absolute;
-                top: 0;
-                bottom: 0;
-            }
-            .characters-count-9 .cards-list .character {
-                position: absolute;
-                top: 0;
-                right: 0;
-                bottom: 0;
-                left: 0;
-                width: auto;
-                height: auto;
-            }
-        }
+    /* Keep the full card visible while preserving its original proportions. */
+    .card-item-zoomed {
+        --zoom-height: min(688px, 95dvh);
+        height: var(--zoom-height);
+        width: calc(var(--zoom-height) * 433 / 688);
+    }
+    .character .card-item-zoomed {
+        width: calc(var(--zoom-height) * 395 / 688);
     }
 
-    /* высота 756px это 688px блока с 8 ролями, 32px блока наблюдателей
-    и 36px блока с настройками игры */
-    @media (max-height: 756px) { /* 688 + 68 */
-        .character-section.characters-count-8 {
-            width: 10.5vh;
-        }
-        /* сдвигает блок с наблюдателями и с управлением игрой,
-        чтоб они не наслаивались на блок ролей */
-        .characters-count-8 ~ .spectators-section,
-        .characters-count-8 ~ .host-controls {
-            right: 10.5vh;
-        }
-
-        /* при высоте вьюпорта менее 688px увеличенная карточка роли
-        видна не целиком. Эти стили уменьшают карточку так, чтобы она
-        сохраняла пропорции и занимала не более 95% высоты экрана */
-        .card-item-zoomed {
-            max-height: 95vh;
-        }
-        .card.card-item .card-item-zoomed {
-            width: 60vh;
-        }
-        .character .card-item-zoomed {
-            width: 54vh;
-        }
-
-
-        .character-section .token-slot {
-            flex-grow: 1;
-            width: 100%;
-        }
-        .character-section .cards-list {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-        }
-        .character-section .cards-list .character {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            width: auto;
-            height: auto;
-        }
+    /* Status overlays follow the slot size for both eight and nine roles. */
+    .character-section .cards-list .status {
+        inset: 0;
+        height: auto;
+        pointer-events: none;
     }
+    .character-section .cards-list .status > span {
+        position: static;
+        margin: 0;
+    }
+    .character-section .cards-list .status svg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 70%;
+        height: 70%;
+        margin: 0;
+    }
+    .character-section .cards-list .status.two-icons svg {
+        width: 50%;
+        height: 50%;
+        top: 30%;
+        left: 30%;
+    }
+    .character-section .cards-list .status.two-icons .magistrated-icon svg,
+    .character-section .cards-list .status.two-icons .true-magistrated-icon svg {
+        top: 70%;
+        left: 70%;
+    }
+}
+@media (max-width: 749px) {
+    .character-section { top: 36px; padding-top: 0; gap: 4px; }
+    .character-section .cards-list { flex-wrap: nowrap; }
+    .character-section .cards-list > .token-slot { flex: 1; min-width: 0; width: auto; }
+    .character-section .cards-list .character { height: 56px; }
+}
+@media (max-width: 600px) {
+    .create-game-panel { padding: 6px; }
+    .create-game-panel-modal { padding: 12px 8px 8px; }
+    .create-game-title { font-size: 21px; }
+    .starting-settings-fields { grid-template-columns: 1fr; }
+    .starting-number { flex-direction: row; text-align: left; }
+    .starting-number > label { flex: 1; }
+    .starting-unique-option { justify-content: flex-end; }
+    .advanced-settings-toggle { font-size: 17px; }
 }
 
 .choose-character {
