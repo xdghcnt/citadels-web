@@ -1004,7 +1004,12 @@ function init(wsServer, path) {
                         paymentCard = state.players[slot].hand[cardInd],
                         building = copiedBuilding || paymentCard,
                         districts = room.playerDistricts[slot];
-                    if (!building || room.buildingBan || room.buildDistricts === -1) return [false, 0];
+                    if (!building) return [false, 0];
+                    if (room.buildingBan) {
+                        sendSlot(slot, "message", "Строительство запрещено Судейской палатой");
+                        return [false, 0];
+                    }
+                    if (room.buildDistricts === -1) return [false, 0];
                     if (!(room.buildDistricts || building.type === "stable" || paymentCard.wizard
                         || (building.kind === 6 && room.currentCharacter === "6_3"))) return [false, 0];
                     if (building.type === "monument" && setupConfig.getCityDistrictCount(districts.filter((_, index) => index !== replaceCardInd)) + 2 >= state.maxDistricts) {

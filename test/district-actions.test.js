@@ -79,15 +79,19 @@ test('Conspiracies keep latest distinct targets within capacity and never publis
 });
 
 test('Judicial Chamber schedules next round, cannot repeat, and ban blocks paid and free builds',()=>{
- const {game}=fixture();game.room.playerDistricts[0]=[district('judicial_chamber'),district('framework')];
+ const {game,messages}=fixture();game.room.playerDistricts[0]=[district('judicial_chamber'),district('framework')];
  game.slotEventHandlers['judicial-chamber-action'](0,0);
  assert.equal(game.state.buildingBanRound,3);assert.equal(game.room.buildingBan||false,false);
  assert.equal(game.room.nextRoundBuildingBan,true);assert.equal(game.room.playerDistricts[0][0].judicialUsed,true);
  game.room.roundNumber=3;game.slotEventHandlers['judicial-chamber-action'](0,0);assert.equal(game.state.buildingBanRound,3);
  game.room.buildingBan=true;hand(game,[district('stable'),district('necropolis')]);
+ messages.length=0;
  game.slotEventHandlers.build(0,0);game.slotEventHandlers['framework-action'](0,0,1);game.slotEventHandlers['build-necropolis'](0,1);
  assert.equal(game.room.playerHand[0],2);assert.equal(game.room.playerDistricts[0].length,2);
  assert.equal(game.room.playerGold[0],20);
+ const refusals=messages.filter(message=>message.event==='message');
+ assert.equal(refusals.length,3);
+ assert.ok(refusals.every(message=>message.target==='host' && message.data==='Строительство запрещено Судейской палатой'));
 });
 
 test('Mirror pays its own discounted price and permanently copies independent Museum state',()=>{

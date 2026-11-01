@@ -111,6 +111,8 @@ class Card extends React.Component {
     componentWillUnmount() {
         window.removeEventListener("scroll", this.hideHint, true);
         window.removeEventListener("resize", this.hideHint);
+        if (this.props.game.cardPress && this.props.game.cardPress.node === this.cardElement)
+            this.props.game.handleBodyRelease();
     }
     moveHint(event) {
         if (event.buttons || event.currentTarget.classList.contains("zoomed") || event.target.closest(".card-zoom-button")) {
@@ -151,14 +153,14 @@ class Card extends React.Component {
             card = (originalCard === "1_2" && data.witchedstate === 1 && !isToken && !isGallery) ? data.witched : originalCard,
             cardType = card.type,
             district = !isCharacter && CitadelsSetup.districts[cardType],
-            customFace = district && district.image,
+            customFace = district && district.image && !district.fullCardImage,
             getBackgroundImage = (isToken, useOriginalCard) => `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
                 isCharacter
                     ? (card !== "0_1" ? (useOriginalCard ? originalCard : card) : "card_back")
                     : cardType || "card_back"
             }.jpg)`,
-            backgroundImage = customFace ? undefined : getBackgroundImage(isToken),
-            backgroundImageZoomed = customFace ? undefined : getBackgroundImage(),
+            backgroundImage = customFace ? undefined : district && district.fullCardImage ? `url(${district.image})` : getBackgroundImage(isToken),
+            backgroundImageZoomed = customFace ? undefined : district && district.fullCardImage ? `url(${district.image})` : getBackgroundImage(),
             cardChosen = this.props.play === undefined && data.userAction != null && data.cardChosen.includes(this.props.id),
             blackmailedChosen = data.cardChosen.includes(card) && !isToken,
             magistrateNotChosen = data.player && data.player.action === 'magistrate-action' && data.cardChosen.indexOf(card) > 0 && !isToken,
@@ -185,13 +187,14 @@ class Card extends React.Component {
             </span> : null}
             {activeBan || pendingBan || spentBan ? <span className={cs("judicial-state-marker", {active: activeBan, pending: pendingBan, spent: spentBan})}
                 aria-label={activeBan ? "Запрет строительства действует" : pendingBan ? "Запрет строительства в следующем раунде" : "Способность использована"}>
-                <i className="material-icons" aria-hidden="true">{activeBan ? "gavel" : pendingBan ? "schedule" : "lock"}</i>
+                <i className="material-icons" aria-hidden="true">{activeBan ? "gavel" : pendingBan ? "hourglass_full" : "lock"}</i>
             </span> : null}
         </>;
         const targetPreview = this.props.play ? game.getRankEightTarget(this.props.slot, this.props.id) : null;
-        const mirrorUnavailable = data.userAction === "mirror_hall" && this.props.play && !game.canCopyMirrorTarget(this.props.slot, this.props.id);
+        const mirrorTarget = data.userAction === "mirror_hall" && this.props.play ? game.getMirrorTargetStatus(this.props.slot, this.props.id) : null;
         const handBuildBlocked = this.props.inHand && game.isHandBuildTargetBlocked(this.props.id);
         const hints = [];
+        if (mirrorTarget && mirrorTarget.reason) hints.push(mirrorTarget.reason);
         if (targetPreview) {
             if (targetPreview.reason) hints.push(targetPreview.reason);
             if (targetPreview.cost != null) hints.push("Плата: " + targetPreview.cost + " золота", targetPreview.details);
@@ -215,23 +218,23 @@ class Card extends React.Component {
                 "judicial-spent": !!spentBan,
                 "hand-card": !!this.props.inHand,
                 "has-build-discount": discount > 0,
-                "district-copy-unavailable": !!mirrorUnavailable || !!handBuildBlocked || !!(targetPreview && !targetPreview.available),
+                "district-copy-unavailable": !!(mirrorTarget && !mirrorTarget.available) || !!handBuildBlocked || !!(targetPreview && !targetPreview.available),
                 "witched-state": !isGallery && !isToken && data.witchedstate === 1 && originalCard === data.witched
             })}
+                 ref={node => this.cardElement = node}
                  style={{backgroundImage}}
                  data-mirror-start={mirrorAnimation ? mirrorAnimation.startedAt : undefined}
                  aria-label={district ? district.name : undefined}
                  title={this.props.inHand ? game.getHandBuildHint(this.props.id) : undefined}
                  onMouseMove={!this.props.inHand && hints.length ? event => this.moveHint(event) : undefined}
                  onMouseLeave={this.hideHint}
-                 onMouseDown={(e) => {this.hideHint(); if (card !== "0_1") game.handleCardPress(e);}}
-                 onTouchStart={(e) => card !== "0_1" ? game.handleCardPress(e) : null}
+                 onPointerDown={(e) => {this.hideHint(); if (card !== "0_1") game.handleCardPress(e);}}
                  onClick={(e) => game.handleCardClick(e, this.props.onClick)}>
                 {customFace ? <DistrictFace district={district} inHand={this.props.inHand}/> : null}
                 {this.renderMirrorTransformation(mirrorAnimation, card.instanceId)}
                 {card !== "0_1" ? (<div className="card-zoom-button material-icons"
-                                        onMouseDown={(e) => game.handleCardZoomClick(e)}
-                                        onTouchStart={(e) => game.handleCardZoomClick(e)}>search</div>) : ""}
+                                        onPointerDown={(e) => game.handleCardZoomClick(e)}
+                                        onClick={(e) => {e.stopPropagation(); e.preventDefault();}}>search</div>) : ""}
                 {card !== "0_1" ? (<div className={`card-item-zoomed`}
                                         style={{backgroundImage: backgroundImageZoomed}}>
                     {customFace ? <DistrictFace district={district} inHand={this.props.inHand}/> : null}
@@ -246,7 +249,7 @@ class Card extends React.Component {
                     <div className="tax-counter-coin"/>
                     <div className="tax-counter-value">{data.tax || 0}</div>
                 </div> : ""}
-                {activeAssignment ? <div className="district-secret-token" title="Тайное назначение действует на следующий раунд">Тайное назначение</div> : null}
+                {activeAssignment ? <div className="district-secret-token" title="Тайное назначение действует на следующий раунд">Цель выбрана</div> : null}
                 {card.exposition ? <div className="exposition-count">
                     <i className="material-icons">content_copy</i> {card.exposition.length}
                 </div> : ""}
@@ -381,7 +384,7 @@ class PlayerSlot extends React.Component {
                 </div>
                 <div className='districts'>
                     <div className="districts-bg"/>
-                    <div className='cards-list'>
+                    <div className='cards-list' style={{"--city-card-gaps": Math.max(1, (districts || []).length - 1)}}>
                         {districts && districts.map((card, id) => (
                             <Card key={card.instanceId || id} id={id} card={card} type="card" game={game} slot={slot} play={true}
                                   onClick={card.scoreOnly ? undefined : () => game.handleClickBuilding(slot, id)}/>
@@ -1438,11 +1441,10 @@ class CreateGamePanel extends React.Component {
                                 <label key={id} className={cs("background-option", {selected: this.state.backgroundId === id})}>
                                     <span className="background-preview">
                                         <img src={background.thumbnail} alt="" width="240" height="140" loading="lazy" decoding="async"/>
-                                        <input type="radio" name="party-background" value={id}
+                                        <input type="radio" name="party-background" value={id} aria-label={background.name}
                                             checked={this.state.backgroundId === id}
                                             onChange={() => this.handleBackgroundChange(id)}/>
                                     </span>
-                                    <span>{background.name}</span>
                                 </label>)}
                         </div>
                     </fieldset> : null}
@@ -1601,12 +1603,9 @@ class DistrictPileCounters extends SetupHelp {
 }
 
 function DistrictEffectsStatus({data, game}) {
-    const effects = data.conspiratorEffects || [];
     const targets = data.player && data.player.conspiratorTargets || [];
-    if (!effects.length && !targets.length && !data.theaterAction) return null;
+    if (!targets.length && !data.theaterAction) return null;
     return <div className="district-effects-status" role="status">
-        {effects.map((effect, index) => <div key={index}>Дом заговорщиков · {window.commonRoom.getPlayerName(data.playerSlots[effect.ownerSlot])}:
-            {effect.sourceIndex === null || effect.sourceIndex === undefined ? " назначение действует; источник покинул город" : " действует тайное назначение"}. Цель скрыта.</div>)}
         {targets.length ? <div className="private-district-targets"><span>Ваши действующие тайные цели:</span>
             {targets.map((target, index) => <div key={index} className="private-district-target">
                 <span>{target.sourceIndex == null ? "Источник покинул город" : "Дом заговорщиков"}</span>
@@ -1639,8 +1638,7 @@ function DistrictActions({game, data}) {
         return <button key={sourceIndex} disabled={emptyFleaMarket}
             title={emptyFleaMarket ? "Для обмена нужна хотя бы одна карта в руке" : undefined}
             onClick={() => game.handleDistrictAction(card.type, sourceIndex)}>
-            {CitadelsSetup.districts[card.type].name}{city.filter(item => item.type === card.type).length > 1 ? " (" + (city.slice(0, sourceIndex + 1).filter(item => item.type === card.type).length) + ")" : ""}{price}
-            {card.type === "museum" ? " · экспозиция " + (card.exposition || []).length : ""}
+            {card.type === "museum" ? "Исп. Музей" : CitadelsSetup.districts[card.type].name}{city.filter(item => item.type === card.type).length > 1 ? " (" + (city.slice(0, sourceIndex + 1).filter(item => item.type === card.type).length) + ")" : ""}{price}
             {emptyFleaMarket ? " · нет карт в руке" : ""}
         </button>;
     })}</>;
@@ -1765,6 +1763,7 @@ class Game extends React.Component {
 
     componentWillUnmount() {
         this.clearMirrorAnimations();
+        this.handleBodyRelease();
     }
 
     resetLocalActionIfStale(state) {
@@ -1915,7 +1914,6 @@ class Game extends React.Component {
         }
         if (this.state.userAction === "mirror_hall" && this.state.buildTarget === cardInd)
             return this.handleStopUserAction();
-        if (this.isHandBuildTargetBlocked(cardInd)) return;
         if (["cardinal-action-player", "mirror_hall", "conspirators_house"].includes(this.state.userAction))
             return;
         if (this.state.userAction === "magician")
@@ -1939,7 +1937,8 @@ class Game extends React.Component {
         } else if (this.state.player.action === "seer-return") {
             this.socket.emit("seer-return", cardInd);
         } else {
-            if (this.state.buildingBan) return;
+            if (this.state.buildingBan) return popup.alert({content: "Строительство запрещено Судейской палатой"});
+            if (this.isHandBuildTargetBlocked(cardInd)) return;
             const cardType = this.state.player.hand[cardInd].type;
             if (!forGold && cardType === "mirror_hall")
                 this.setUserAction("mirror_hall", {buildTarget: cardInd});
@@ -1968,8 +1967,18 @@ class Game extends React.Component {
     }
 
     canCopyMirrorTarget(slot, index) {
+        return this.getMirrorTargetStatus(slot, index).available;
+    }
+
+    getMirrorTargetStatus(slot, index) {
         const data = this.state, card = data.playerDistricts[slot] && data.playerDistricts[slot][index];
-        return slot !== data.userSlot && !!card && card.type !== "theater" && this.canBuildDistrictType(card.type);
+        let reason;
+        if (!card) reason = "Нет постройки";
+        else if (slot === data.userSlot) reason = "Можно копировать только чужой квартал";
+        else if (card.type === "theater") reason = "Зеркальный чертог не может копировать Театр";
+        if (reason) return {available: false, reason};
+        const status = this.getHandBuildStatus(data.buildTarget, {mirrorTarget: [slot, index]});
+        return Object.assign({}, status, {available: !status.reason});
     }
 
     handleBuildMirror(targetSlot, targetCardIndex) {
@@ -2057,7 +2066,11 @@ class Game extends React.Component {
 
         const candidates = [];
         const addCandidate = (building, price, removeIndex) => candidates.push({building, price, removeIndex});
-        if (frameworkIndex !== undefined) {
+        if (options.mirrorTarget) {
+            const [slot, targetIndex] = options.mirrorTarget;
+            const building = (data.playerDistricts[slot] || [])[targetIndex];
+            if (building) addCandidate(building, baseCost);
+        } else if (frameworkIndex !== undefined) {
             if (city[frameworkIndex] && city[frameworkIndex].type === "framework") addCandidate(card, 0, frameworkIndex);
         } else if (selectedNecropolis) {
             city.forEach((_, removeIndex) => addCandidate(card, 0, removeIndex));
@@ -2465,10 +2478,16 @@ class Game extends React.Component {
 
     handleCardZoomClick(e) {
         e.stopPropagation();
-        this.zoomCard(e.target.closest(".card-item"));
+        e.preventDefault();
+        this.startCardPreview(e, e.target.closest(".card-item"), true);
     }
 
     handleCardClick(e, clickFunc) {
+        if (this.suppressCardClick && e.detail !== 0) {
+            this.suppressCardClick = false;
+            e.preventDefault();
+            return;
+        }
         if (this.zoomed)
             this.zoomCard();
         else if (clickFunc)
@@ -2476,23 +2495,49 @@ class Game extends React.Component {
     }
 
     handleCardPress(e) {
-        if (window.innerWidth < 750)
-            return;
-        const node = e.currentTarget;
-        if (!node.classList.contains("no-zoom")) {
-            e.stopPropagation();
-            this.wasReleased = false;
-            clearTimeout(this.holdTimeout);
-            this.holdTimeout = setTimeout(() => {
-                if (!this.wasReleased)
-                    this.zoomCard(node);
-            }, 400);
-        }
+        this.startCardPreview(e, e.currentTarget, false);
+    }
+
+    startCardPreview(e, node, immediate) {
+        if (e.isPrimary === false || e.button !== 0) return;
+        this.handleBodyRelease();
+        this.suppressCardClick = false;
+        if (!node || node.classList.contains("no-zoom") || (!immediate && window.innerWidth < 750)) return;
+        e.stopPropagation();
+        const press = {node, pointerId: e.pointerId, previewShown: false}, startX = e.clientX, startY = e.clientY;
+        this.cardPress = press;
+        const release = event => {
+            if (event.pointerId === undefined || event.pointerId === press.pointerId) this.handleBodyRelease();
+        };
+        const visibility = () => {if (document.hidden) this.handleBodyRelease();};
+        const cancelPending = () => {if (!press.previewShown) this.handleBodyRelease();};
+        const move = event => {
+            if (Math.hypot(event.clientX - startX, event.clientY - startY) > 8) cancelPending();
+        };
+        const listeners = [[window, "pointerup", release], [window, "pointercancel", release],
+            [window, "blur", release], [window, "pointermove", move], [window, "scroll", cancelPending],
+            [document, "visibilitychange", visibility], [node, "lostpointercapture", release]];
+        press.cleanup = () => listeners.forEach(([target, name, handler]) => target.removeEventListener(name, handler, true));
+        listeners.forEach(([target, name, handler]) => target.addEventListener(name, handler, true));
+        node.setPointerCapture(press.pointerId);
+        const show = () => {
+            if (this.cardPress !== press || !node.isConnected) return;
+            press.previewShown = true;
+            this.suppressCardClick = true;
+            this.zoomCard(node);
+        };
+        if (immediate) show();
+        else this.holdTimeout = setTimeout(show, 400);
     }
 
     handleBodyRelease() {
-        this.wasReleased = true;
-        //this.zoomCard();
+        clearTimeout(this.holdTimeout);
+        const press = this.cardPress;
+        if (!press) return;
+        this.cardPress = null;
+        press.cleanup();
+        if (this.zoomed) this.zoomCard();
+        if (press.node.hasPointerCapture(press.pointerId)) press.node.releasePointerCapture(press.pointerId);
     }
 
     handleRemovePlayer(id, evt) {
@@ -2654,10 +2699,10 @@ class Game extends React.Component {
                             <DistrictPileCounters data={data}/>
                         </div>
                         : null}
-                    <DistrictEffectsStatus data={data} game={this}/>
                     <div className="players-section">
                         {slots.map((slot) => (<PlayerSlot data={data} slot={slot} game={this}/>))}
                     </div>
+                    <DistrictEffectsStatus data={data} game={this}/>
                     <div className="control-section">
                         {data.player && data.player.hand ?
                             <div className={cs("hand-section", {noAction: !districtCardsMinimized})}>
@@ -2815,8 +2860,8 @@ class Game extends React.Component {
                                     </div>
                                     : null}
                                 {data.userAction ?
-                                    <div>
-                                        <div className={cs("action-button", {"mirror-copy-actions": data.userAction === "mirror_hall", "flea-market-actions": data.userAction === "flea_market"})}>
+                                    <div className={data.userAction === "conspirators_house" ? "conspirators-panel" : undefined}>
+                                        <div className={cs("action-button", {"mirror-copy-actions": data.userAction === "mirror_hall", "flea-market-actions": data.userAction === "flea_market", "conspirators-actions": data.userAction === "conspirators_house"})}>
                                             <button onClick={() => this.handleStopUserAction()}>Отмена действия</button>
                                             <p className="status-text">{userActionText}</p>
                                             {data.userAction === "flea_market" ? <button disabled={data.cardChosen.length !== 1}
@@ -2846,7 +2891,7 @@ class Game extends React.Component {
                                                 ([...Array(incomeValue + 1).keys()].map((i) => (
                                                     <button
                                                         onClick={() => this.handleAbbatIncome(i)}>{i} к.</button>))) : null}
-                                            {data.userAction === "conspirators_house" ? <div className="cards-list">
+                                            {data.userAction === "conspirators_house" ? <div className="cards-list choose-character conspirators-characters">
                                                 {data.characterInGame.map(character => <Card key={character} type="character" card={character} game={this}
                                                     onClick={() => this.handleConspiratorsTarget(character)}/>)}
                                             </div> : null}

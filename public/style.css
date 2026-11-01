@@ -288,12 +288,16 @@ h1, h2, h3 {
     justify-content: center;
 }
 
+.districts .cards-list > .card {
+    flex-shrink: 0;
+}
+
 .districts .cards-list .card:not(:first-child) {
-    margin-left: -55px;
+    /* Keep full card faces in a fixed fan; hovering only raises the card. */
+    margin-left: min(-55px, calc((100% - 137px) / var(--city-card-gaps, 1) - 135px));
 }
 
 .districts .cards-list .card:hover {
-    flex-shrink: 0;
     z-index: 1;
 }
 
@@ -427,14 +431,15 @@ body {
 
 .background-options {
     display: flex;
-    flex-direction: column;
     gap: 10px;
-    max-width: 520px;
+    overflow-x: auto;
+    padding: 4px;
     margin: 12px auto 0;
 }
 
 .background-option {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     gap: 12px;
     padding: 8px;
@@ -456,8 +461,7 @@ body {
 
 .background-preview {
     position: relative;
-    width: 44%;
-    max-width: 160px;
+    width: 112px;
     flex-shrink: 0;
 }
 
@@ -518,23 +522,26 @@ body {
     border-radius: 9px;
 }
 
-.character .card-item-zoomed {
-    width: 395px;
-}
-
 .card-item-zoomed {
+    --zoom-width: 433;
+    --zoom-height: min(688px, 95dvh, calc((100vw - 24px) * 688 / var(--zoom-width)));
     display: none;
-    width: 433px;
-    height: 688px;
+    width: calc(var(--zoom-height) * var(--zoom-width) / 688);
+    height: var(--zoom-height);
+    flex-shrink: 0;
     background-size: cover;
 }
 
+.character .card-item-zoomed {
+    --zoom-width: 395;
+}
+
 .card-item-zoomed.card {
-    width: 434px;
     border-radius: 40px;
 }
 
 .card-item.zoomed {
+    box-sizing: border-box;
     position: fixed !important;
     top: 0;
     bottom: 0;
@@ -614,16 +621,20 @@ body {
 .card-zoom-button {
     visibility: hidden;
     position: absolute;
-    width: 20px;
-    height: 20px;
-    right: 0;
-    margin: 3px 5px;
+    top: 2px;
+    width: 1em;
+    height: 1em;
+    right: 2px;
+    margin: 0;
     font-size: 23px;
+    line-height: 1;
+    text-align: right;
     font-weight: bold;
     cursor: pointer;
     color: #edc36b;
     text-shadow: 0px 2px 1px black;
     user-select: none;
+    touch-action: none;
 }
 
 .card-item:hover .card-zoom-button {
@@ -969,10 +980,12 @@ button {
 
     .card-zoom-button {
         visibility: visible;
-        width: 40px;
-        height: 40px;
         font-size: 40px;
         opacity: 0.8;
+    }
+
+    .character-section .card-zoom-button {
+        font-size: 24px;
     }
 
     .characters-panel .character-slot {
@@ -1724,16 +1737,6 @@ button.inactive {
     .character-section .token-slot { position: relative; width: 100%; height: calc(var(--role-width) * 1.2113); }
     .character-section .cards-list .character { width: 100%; height: 100%; }
 
-    /* Keep the full card visible while preserving its original proportions. */
-    .card-item-zoomed {
-        --zoom-height: min(688px, 95dvh);
-        height: var(--zoom-height);
-        width: calc(var(--zoom-height) * 433 / 688);
-    }
-    .character .card-item-zoomed {
-        width: calc(var(--zoom-height) * 395 / 688);
-    }
-
     /* Status overlays follow the slot size for both eight and nine roles. */
     .character-section .cards-list .status {
         inset: 0;
@@ -1849,9 +1852,8 @@ button.inactive {
     .mirror-transformation { display: none; }
     .mirror-transformation, .mirror-transformation > * { animation: none; }
 }
-.custom-district > .card-zoom-button { top: 24%; }
 .district-face { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; align-items: stretch; border-radius: inherit; padding: 5%; background: #eee8d6; color: #292622; container-type: inline-size; overflow: hidden; }
-.district-face-full-card { display: block; width: 100%; height: 100%; padding: 0; object-fit: fill; }
+.district-face-full-card { display: block; width: 100%; height: 100%; padding: 0; object-fit: cover; object-position: left top; }
 .district-face-heading { display: flex; align-items: flex-start; gap: 4%; flex: 0 0 19%; font-size: 10cqw; line-height: 1.05; }
 .district-face-heading strong { flex: 1; }
 .district-face-cost { flex: 0 0 18%; aspect-ratio: 1; display: grid; place-items: center; background: #e3b548; color: #291c05; border: 1px solid #9b701b; border-radius: 50%; font-size: 13cqw; }
@@ -1914,11 +1916,15 @@ button.inactive {
 .mirror-copy-actions { top: auto; bottom: 100%; flex-wrap: wrap; row-gap: 8px; }
 .mirror-copy-actions > .status-text { position: static; flex-basis: 100%; order: -1; margin: 0 8px 4px; box-sizing: border-box; text-align: center; }
 
+.conspirators-panel { width: 100%; min-width: 0; }
+.conspirators-actions { top: auto; bottom: 100%; flex-wrap: wrap; gap: 8px; box-sizing: border-box; padding: 6px 8px; background: #ffffffd4; }
+.conspirators-actions > .status-text { position: static; flex-basis: 100%; order: -1; margin: 0; text-align: center; }
+.conspirators-actions > .conspirators-characters { flex-basis: 100%; overflow-x: auto; justify-content: flex-start; padding: 4px; box-sizing: border-box; }
+.conspirators-characters > .character { flex-shrink: 0; }
+
 /* Instance markers stay on visible cards, including another player's revealed hand. */
-.district-discount-marker { position: absolute; top: 4%; right: 5%; z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid #b99955; border-radius: 999px; background: linear-gradient(#fff6d8, #e9d19a); color: #5d421d; box-shadow: 0 1px 3px #3826084d, inset 0 1px 0 #fff8df; font: 600 13px/1 Georgia, "Times New Roman", serif; pointer-events: none; }
-.custom-district .district-discount-marker { top: 16%; }
-.has-build-discount > .card-zoom-button { top: 24%; }
-.district-discount-coin { display: inline-block; flex: none; width: .85em; height: .85em; border: 1px solid #ab7621; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6bf, #e8c663 45%, #bc8a2c); box-shadow: inset 0 0 0 1px #f5df91, inset 0 0 0 2px #bd8d37; }
+.district-discount-marker { position: absolute; top: 16%; right: 5%; z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid #b99955; border-radius: 999px; background: linear-gradient(#fff6d8, #e9d19a); color: #5d421d; box-shadow: 0 1px 3px #3826084d, inset 0 1px 0 #fff8df; font: 600 13px/1 Georgia, "Times New Roman", serif; pointer-events: none; }
+.district-discount-coin { display: inline-block; flex: none; width: calc(.85em + 2px); height: calc(.85em + 2px); background: url('./icons/decoration-coin.png') center / contain no-repeat; }
 .judicial-state-marker { position: absolute; top: 45%; left: 5%; z-index: 1; display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid; border-radius: 50%; box-shadow: 0 1px 4px #0005; pointer-events: none; }
 .judicial-state-marker .material-icons { font-size: 18px; }
 .judicial-state-marker.active { color: #845408; background: #fff3bd; border-color: #d29d35; }

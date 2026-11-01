@@ -7,14 +7,16 @@ const setup = require("../public/setup");
 const source = fs.readFileSync(require.resolve("../public/app.jsx"), "utf8");
 
 // Exercise the real client event boundary, as in setup-client.test.js.
-function gameClient(state, connect = false) {
+function gameClient(state, connect = false, environment = {}) {
     const handlers = {};
+    const alerts = [];
     class Component {setState(change) {this.state = Object.assign({}, this.state, change);}}
     const context = vm.createContext({React: {Component}, CitadelsSetup: setup, localStorage: {},
-        setTimeout, clearTimeout,
+        setTimeout, clearTimeout, popup: {alert: value => alerts.push(value.content)},
         window: {socket: {on(name, handler) {handlers[name] = handler;}}, matchMedia: () => ({matches: false})},
         document: {body: {style: {}}},
-        CommonRoom: {roomInit(game) {game.userId = "host"; return {roomId: "test"};}, processCommonRoom() {}}
+        CommonRoom: {roomInit(game) {game.userId = "host"; return {roomId: "test"};}, processCommonRoom() {}},
+        ...environment
     });
     const start = source.indexOf("class Game extends React.Component");
     const end = source.indexOf("    render()", start);
@@ -24,8 +26,105 @@ function gameClient(state, connect = false) {
     const emitted = [];
     game.socket = {emit(...args) {emitted.push(JSON.parse(JSON.stringify(args)));}, on(name, handler) {handlers[name] = handler;}};
     if (connect) {game.componentDidMount(); emitted.length = 0;}
-    return {game, emitted, handlers};
+    return {game, emitted, handlers, alerts};
 }
+
+function previewClient() {
+    const events = () => {
+        const listeners = new Map();
+        return {addEventListener(name, callback) {listeners.set(name, callback);},
+            removeEventListener(name) {listeners.delete(name);},
+            fire(name, event = {}) {if (listeners.has(name)) listeners.get(name)(event);}};
+    };
+    const window = Object.assign(events(), {innerWidth: 1200});
+    const document = Object.assign(events(), {hidden: false});
+    const timers = new Set(), classes = new Set();
+    const node = Object.assign(events(), {isConnected: true, dataset: {}, querySelector() {return null;},
+        classList: {add: value => classes.add(value), remove: value => classes.delete(value), contains: value => classes.has(value)},
+        setPointerCapture() {}, hasPointerCapture() {return false;}, closest() {return node;}});
+    const {game} = gameClient({}, false, {window, document,
+        setTimeout: callback => {timers.add(callback); return callback;}, clearTimeout: timer => timers.delete(timer)});
+    const event = {pointerId: 1, button: 0, isPrimary: true, pointerType: "mouse", target: node, currentTarget: node,
+        clientX: 10, clientY: 10, detail: 1, stopPropagation() {}, preventDefault() {}};
+    return {game, node, event, window, document, timers, hold() {for (const callback of [...timers]) callback();}};
+}
+
+test("loupe preview lasts only while pressed and release never selects the card", () => {
+    const {game, node, event, window} = previewClient();
+    let selected = 0;
+    game.handleCardZoomClick(event);
+    assert.equal(node.classList.contains("zoomed"), true);
+    window.fire("pointerup", {pointerId: 1});
+    assert.equal(node.classList.contains("zoomed"), false);
+    game.handleCardClick(event, () => selected++);
+    assert.equal(selected, 0);
+    game.handleCardPress(event);
+    window.fire("pointerup", {pointerId: 1});
+    game.handleCardClick(event, () => selected++);
+    assert.equal(selected, 1);
+});
+
+test("holding a card previews it, while cancellation and unmount clear pending gestures", () => {
+    for (const cancel of [x => x.window.fire("pointercancel", {pointerId: 1}), x => x.window.fire("blur"),
+        x => {x.document.hidden = true; x.document.fire("visibilitychange");}, x => x.game.componentWillUnmount()]) {
+        const x = previewClient();
+        x.game.handleCardPress(x.event);
+        x.hold();
+        assert.equal(x.node.classList.contains("zoomed"), true);
+        cancel(x);
+        assert.equal(x.node.classList.contains("zoomed"), false);
+        let selected = false;
+        x.game.handleCardClick(x.event, () => {selected = true;});
+        assert.equal(selected, false);
+        const pending = previewClient();
+        pending.game.handleCardPress(pending.event);
+        cancel(pending);
+        pending.hold();
+        assert.equal(pending.node.classList.contains("zoomed"), false);
+    }
+});
+
+test("Judicial Chamber explains a blocked hand click without blocking Museum selection", () => {
+    const {game, emitted, alerts} = gameClient({buildingBan: true, playerGold: {0: 10},
+        player: {action: null, hand: [{type: "temple", cost: 1, kind: 5}]},
+        playerDistricts: {0: [{type: "temple"}, {type: "museum"}]}});
+    game.handleClickHandCard(0);
+    assert.deepEqual(alerts, ["Строительство запрещено Судейской палатой"]);
+    assert.deepEqual(emitted, []);
+    game.setUserAction("museum", {districtSource: 1});
+    game.handleClickHandCard(0);
+    assert.deepEqual(emitted, [["museum-action", 0, 1]]);
+    assert.equal(alerts.length, 1);
+});
+
+test("Mirror targets explain each prohibition and reject the same targets on click", () => {
+    const {game, emitted} = gameClient({citySize: 7, currentCharacter: "4_1", playerGold: {0: 6},
+        player: {action: null, hand: [{type: "mirror_hall", cost: 6, kind: 9}]},
+        playerDistricts: {0: [{type: "temple", kind: 5}], 1: [{type: "theater"}, {type: "temple", kind: 5}, {type: "monument", kind: 9}, {type: "secret_vault"}]}});
+    game.handleClickHandCard(0);
+    for (const [slot, index, reason] of [[0, 0, "Можно копировать только чужой квартал"],
+        [1, 0, "Зеркальный чертог не может копировать Театр"],
+        [1, 1, "Превышен лимит повторяющихся кварталов"],
+        [1, 3, "Тайное убежище нельзя построить"]]) {
+        assert.equal(game.getMirrorTargetStatus(slot, index).reason, reason);
+        assert.equal(game.canCopyMirrorTarget(slot, index), false);
+        game.handleClickBuilding(slot, index);
+        assert.deepEqual(emitted, []);
+    }
+    game.state.playerDistricts[0] = Array.from({length: 5}, () => ({type: "tavern"}));
+    assert.equal(game.getMirrorTargetStatus(1, 2).reason, "Монумент нельзя построить как последний квартал");
+    game.state.playerDistricts[0] = [];
+    game.state.buildingBan = true;
+    assert.equal(game.getMirrorTargetStatus(1, 1).reason, "Строительство запрещено Судейской палатой");
+    game.state.buildingBan = false;
+    game.state.playerGold[0] = 5;
+    assert.equal(game.getMirrorTargetStatus(1, 1).reason, "Недостаточно золота");
+    game.state.playerGold[0] = 6;
+    assert.equal(game.getMirrorTargetStatus(1, 1).available, true);
+    assert.equal(game.getMirrorTargetStatus(1, 1).cost, 6);
+    game.handleClickBuilding(1, 1);
+    assert.deepEqual(emitted, [["build-mirror", 0, 1, 1]]);
+});
 
 test("the client quotes the current construction payment after permanent and per-factory reductions", () => {
     const {game} = gameClient({player: {hand: [{type: "museum", kind: 9, cost: 5, buildDiscount: 1}]}, playerDistricts: {0: [{type: "factory", kind: 9}, {type: "factory", kind: 9}]}});
@@ -184,7 +283,7 @@ test("choosing one Museum sends that exact source index and clears the local sel
 });
 
 test("Mirror Hall lets the player cancel, build without copying, or select a foreign non-Theater district", () => {
-    const {game, emitted} = gameClient({player: {hand: [{type: "mirror_hall", cost: 6, kind: 9}]}, playerDistricts: {0: [], 1: [{type: "theater"}, {type: "winery"}]}});
+    const {game, emitted} = gameClient({playerGold: {0: 6}, player: {hand: [{type: "mirror_hall", cost: 6, kind: 9}]}, playerDistricts: {0: [], 1: [{type: "theater"}, {type: "winery"}]}});
     game.handleClickHandCard(0);
     assert.equal(game.state.userAction, "mirror_hall");
     assert.deepEqual(emitted, []);
@@ -264,7 +363,7 @@ test("Magistrate cannot reveal an order to gain another copy unless its override
 });
 
 test("ordinary construction and Mirror results honor repeat caps while Quarry keeps its construction exception", () => {
-    const {game, emitted} = gameClient({gameSetup: {rules: setup.normalizeRules({duplicateLimit: 1})}, player: {action: null, hand: [{type: "tavern", cost: 1}, {type: "mirror_hall", cost: 6}]}, playerDistricts: {0: [{type: "tavern", cost: 1}, {type: "tavern", cost: 1}], 1: [{type: "tavern", cost: 1}, {type: "market", cost: 2}]}});
+    const {game, emitted} = gameClient({playerGold: {0: 6}, gameSetup: {rules: setup.normalizeRules({duplicateLimit: 1})}, player: {action: null, hand: [{type: "tavern", cost: 1}, {type: "mirror_hall", cost: 6}]}, playerDistricts: {0: [{type: "tavern", cost: 1}, {type: "tavern", cost: 1}], 1: [{type: "tavern", cost: 1}, {type: "market", cost: 2}]}});
     game.handleClickHandCard(0);
     assert.deepEqual(emitted, []);
     game.state.playerDistricts[0].push({type: "quarry", cost: 4});
