@@ -261,3 +261,110 @@ test('Chamber highlight follows the activated instance after transfer while pres
  const restored=fixture().game;restored.setSnapshot(JSON.parse(JSON.stringify(game.getSnapshot())));
  assert.deepEqual(restored.room.buildingBanSources,game.room.buildingBanSources);
 });
+
+test('destroying and drawing a discounted district restores its full construction price',()=>{
+ const {game}=fixture();const card=district('manor');
+ game.room.playerDistricts[0]=[district('architects_workshop')];hand(game,[card]);
+ game.slotEventHandlers['architects-workshop-action'](0,0);
+ game.slotEventHandlers.build(0,0);
+ assert.equal(card.buildDiscount,1);assert.equal(game.room.playerGold[0],15);
+ game.state.players[0].action='warlord-action';game.slotEventHandlers.destroy(0,0,1);
+ assert.equal(game.state.districtDiscard[0],card);assert.equal(card.cost,3);
+ game.state.districtDeck=[];game.slotEventHandlers['take-resources'](0,'card');
+ game.slotEventHandlers['take-card'](0,0);
+ assert.equal(game.state.players[0].hand[0],card);
+ const beforeGold=game.room.playerGold[0];game.slotEventHandlers.build(0,0);
+ assert.equal(beforeGold-game.room.playerGold[0],3);
+ assert.equal(card.buildDiscount,undefined);
+});
+
+test('destroying a Museum clears discounts on its building and exhibits before redrawing',()=>{
+ const {game}=fixture();const museum=district('museum'),exhibit=district('manor');
+ game.room.playerDistricts[0]=[district('architects_workshop')];hand(game,[museum,exhibit]);
+ game.slotEventHandlers['architects-workshop-action'](0,0);game.slotEventHandlers.build(0,0);
+ game.slotEventHandlers['museum-action'](0,0,1);
+ assert.equal(museum.exposition[0],exhibit);assert.equal(exhibit.buildDiscount,1);
+ game.state.players[0].action='warlord-action';game.slotEventHandlers.destroy(0,0,1);
+ assert.ok(game.state.districtDiscard.includes(museum));assert.equal(museum.buildDiscount,undefined);
+ assert.ok(game.state.districtDiscard.includes(exhibit));assert.equal(exhibit.cost,3);
+ assert.equal(museum.exposition,undefined);
+ game.state.districtDeck=[];game.slotEventHandlers['take-resources'](0,'card');
+ game.slotEventHandlers['take-card'](0,game.state.players[0].choose.indexOf(exhibit));
+ assert.equal(game.state.players[0].hand[0],exhibit);
+ const beforeGold=game.room.playerGold[0];game.slotEventHandlers.build(0,0);
+ assert.equal(beforeGold-game.room.playerGold[0],3);
+ assert.equal(exhibit.buildDiscount,undefined);
+});
+
+test('Laboratory clears only the discarded card discount and rejects invalid or repeated uses',()=>{
+ const {game}=fixture();const card=district('manor'),kept=district('church');
+ game.room.playerDistricts[0]=[district('architects_workshop'),district('laboratory')];hand(game,[card,kept]);
+ game.slotEventHandlers['architects-workshop-action'](0,0);
+ for(const args of [[0,99,1],[0,0,0],[1,0,1]]){
+  const before=JSON.stringify(game.getSnapshot());game.slotEventHandlers['laboratory-action'](...args);
+  assert.equal(JSON.stringify(game.getSnapshot()),before);
+ }
+ game.slotEventHandlers['laboratory-action'](0,0,1);
+ assert.equal(game.state.districtDiscard[0],card);assert.equal(card.cost,3);
+ assert.equal(kept.buildDiscount,1);
+ const afterUse=JSON.stringify(game.getSnapshot());game.slotEventHandlers['laboratory-action'](0,0,1);
+ assert.equal(JSON.stringify(game.getSnapshot()),afterUse);assert.equal(kept.buildDiscount,1);
+ game.state.districtDeck=[];game.slotEventHandlers['take-resources'](0,'card');
+ game.slotEventHandlers['take-card'](0,0);
+ assert.equal(game.state.players[0].hand[1],card);
+ const beforeGold=game.room.playerGold[0];game.slotEventHandlers.build(0,1);
+ assert.equal(beforeGold-game.room.playerGold[0],3);
+ assert.equal(card.buildDiscount,undefined);
+});
+
+test('Scholar choices retain recycled Flea Market discounts and omit Laboratory discounts',()=>{
+ for(const [source,event,expectedDiscount] of [['flea_market','flea-market-action',1],['laboratory','laboratory-action',undefined]]){
+  const {game}=fixture();const card=district('manor');
+  game.room.playerDistricts[0]=[district('architects_workshop'),district(source)];hand(game,[card]);
+  game.slotEventHandlers['architects-workshop-action'](0,0);
+  game.state.districtDeck=source==='flea_market'?[district('church')]:[];
+  game.slotEventHandlers[event](0,0,1);assert.equal(game.state.districtDiscard[0],card);
+  game.state.players[0].action='scholar-action';game.slotEventHandlers['scholar-action'](0);
+  assert.equal(game.state.players[0].choose[0],card);
+  assert.equal(game.state.players[0].choose[0].buildDiscount,expectedDiscount);
+  assert.equal(game.state.districtDiscard.length,0);
+ }
+});
+
+test('Tower previews retain discounts after the Magician recycles discarded cards',()=>{
+ const {game}=fixture();const cards=['manor','temple','market'].map(district);
+ game.room.playerDistricts[0]=[district('architects_workshop'),district('divination_tower')];hand(game,cards.slice());
+ game.slotEventHandlers['architects-workshop-action'](0,0);
+ game.state.districtDeck=[district('church')];game.state.players[0].action='magician-action';
+ game.slotEventHandlers['exchange-hand'](0,0,[0,1,2]);
+ assert.equal(game.state.districtDiscard.length,0);assert.equal(game.state.districtDeck.length,1);
+ const remaining=game.state.districtDeck[0];assert.ok(cards.includes(remaining));assert.equal(remaining.buildDiscount,1);
+ game.slotEventHandlers['divination-tower-action'](0,1);
+ assert.equal(game.state.players[0].choose[0].buildDiscount,1);
+ assert.equal(game.state.players[0].choose[0].type,remaining.type);
+ assert.equal(game.state.districtDeck[0],remaining);
+});
+test('Den payment clears discounts only on cards actually discarded after a successful build',()=>{
+ const {game}=fixture();const paid=district('manor'),paidSecond=district('church'),kept=district('temple');
+ paid.buildDiscount=1;paidSecond.buildDiscount=2;kept.buildDiscount=3;
+ const den={...district('den_of_thieves'),buildDiscount:4};
+ hand(game,[paid,den,paidSecond,kept]);game.room.playerGold[0]=0;
+ for(const indexes of [[0,0],[0,1],[0,99]]){
+  const before=JSON.stringify(game.getSnapshot());game.slotEventHandlers['build-den-of-thieves'](0,indexes,1);
+  assert.equal(JSON.stringify(game.getSnapshot()),before);
+ }
+ game.room.buildDistricts=0;
+ const blocked=JSON.stringify(game.getSnapshot());game.slotEventHandlers['build-den-of-thieves'](0,[0,2,3],1);
+ assert.equal(JSON.stringify(game.getSnapshot()),blocked);
+ game.room.buildDistricts=5;game.slotEventHandlers['build-den-of-thieves'](0,[0,2,3],1);
+ assert.equal(game.room.playerDistricts[0][0],den);assert.equal(den.buildDiscount,4);
+ assert.deepEqual(game.state.districtDiscard,[paid,paidSecond]);
+ assert.equal(paid.buildDiscount,undefined);assert.equal(paidSecond.buildDiscount,undefined);
+ assert.equal(game.state.players[0].hand[0],kept);assert.equal(kept.buildDiscount,3);
+ assert.equal(game.room.playerGold[0],0);
+ game.state.districtDeck=[];game.room.playerGold[0]=10;
+ game.slotEventHandlers['take-resources'](0,'card');
+ game.slotEventHandlers['take-card'](0,game.state.players[0].choose.indexOf(paid));
+ const beforeGold=game.room.playerGold[0];game.slotEventHandlers.build(0,1);
+ assert.equal(beforeGold-game.room.playerGold[0],3);
+});

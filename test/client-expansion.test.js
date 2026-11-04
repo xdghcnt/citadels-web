@@ -501,22 +501,14 @@ function fleaMarketClient(state = {}, connect = false) {
     }, state), connect);
 }
 
-test("Flea Market selects exactly one arbitrary hand card and submits only after confirmation", () => {
-    for (const tookResource of [false, true]) {
+test("Flea Market immediately exchanges the clicked hand card using the activated source", () => {
+    for (const tookResource of [false, true]) for (const index of [0, 1]) {
         const {game, emitted} = fleaMarketClient({tookResource, buildingBan: true, buildDistricts: 0, districtDeckCount: 0, districtDiscardCount: 0});
         game.handleDistrictAction("flea_market", 1);
         assert.equal(game.state.userAction, "flea_market");
-        game.handleFleaMarketExchange();
         assert.deepEqual(emitted, []);
-        game.handleClickHandCard(1);
-        assert.deepEqual(Array.from(game.state.cardChosen), [1]);
-        game.handleClickHandCard(0); // Secret Vault is a legal exchange, even under a construction ban.
-        assert.deepEqual(Array.from(game.state.cardChosen), [0]);
-        assert.equal(game.getHandBuildHint(0), "Карта выбрана для обмена Барахолкой");
-        assert.equal(game.getHandBuildHint(1), "Выберите эту карту для обмена Барахолкой");
-        assert.deepEqual(emitted, []);
-        game.handleFleaMarketExchange();
-        assert.deepEqual(emitted, [["flea-market-action", 0, 1]]);
+        game.handleClickHandCard(index);
+        assert.deepEqual(emitted, [["flea-market-action", index, 1]]);
         assert.equal(game.state.userAction, null);
         assert.equal(game.state.fleaMarketContext, null);
         assert.equal(game.state.districtSource, null);
@@ -524,20 +516,18 @@ test("Flea Market selects exactly one arbitrary hand card and submits only after
     }
 });
 
-test("Flea Market cancellation and deselection consume nothing and stale Wizard choose does not block it", () => {
+test("Flea Market cancellation consumes nothing and stale Wizard choose does not block exchange", () => {
     const {game, emitted} = fleaMarketClient();
     game.state.player.choose = [{type: "tavern"}];
     game.state.player.action = "wizard-action";
     game.handleDistrictAction("flea_market", 0);
-    game.handleClickHandCard(0);
-    game.handleClickHandCard(0);
-    assert.deepEqual(Array.from(game.state.cardChosen), []);
-    game.handleFleaMarketExchange();
-    game.handleClickHandCard(1);
     game.handleStopUserAction();
-    game.handleFleaMarketExchange();
     assert.deepEqual(emitted, []);
     assert.equal(game.state.fleaMarketContext, null);
+    game.handleDistrictAction("flea_market", 0);
+    game.handleClickHandCard(1);
+    assert.deepEqual(emitted, [["flea-market-action", 1, 0]]);
+    assert.equal(game.state.userAction, null);
 });
 
 test("Flea Market validates the exact unused source and requires a hand and an ordinary active turn", () => {
@@ -567,7 +557,7 @@ test("Flea Market validates the exact unused source and requires a hand and an o
     assert.equal(game.state.userAction, "flea_market");
 });
 
-test("Flea Market rejects stale hand, source, turn and mandatory-response contexts before confirming", () => {
+test("Flea Market rejects stale hand, source, turn and mandatory-response contexts before exchanging", () => {
     const mutations = [
         game => game.state.player.hand.reverse(),
         game => game.state.player.hand.push({type: "temple"}),
@@ -585,9 +575,8 @@ test("Flea Market rejects stale hand, source, turn and mandatory-response contex
     for (const mutate of mutations) {
         const {game, emitted} = fleaMarketClient();
         game.handleDistrictAction("flea_market", 0);
-        game.handleClickHandCard(0);
         mutate(game);
-        game.handleFleaMarketExchange();
+        game.handleClickHandCard(0);
         assert.deepEqual(emitted, []);
         assert.equal(game.state.userAction, null);
         assert.equal(game.state.fleaMarketContext, null);
@@ -604,7 +593,6 @@ test("both real socket state handlers cancel stale Flea Market selections and re
     for (const kind of ["public", "private"]) {
         const {game, emitted, handlers} = fleaMarketClient({}, true);
         game.handleDistrictAction("flea_market", 1);
-        game.handleClickHandCard(0);
         if (kind === "private") {
             handlers["player-state"](JSON.parse(JSON.stringify(game.state.player)));
             assert.equal(game.state.userAction, "flea_market");
@@ -619,6 +607,50 @@ test("both real socket state handlers cancel stale Flea Market selections and re
         assert.equal(game.state.userAction, null, kind);
         assert.equal(game.state.fleaMarketContext, null, kind);
         assert.deepEqual(Array.from(game.state.cardChosen), [], kind);
+        assert.deepEqual(emitted, []);
+    }
+});
+
+test("Framework only starts when the character can still build a legal hand card", () => {
+    const card = (type, extra = {}) => ({type, cost: setup.districts[type].cost, kind: setup.districts[type].type, ...extra});
+    const cases = [
+        {buildDistricts: -1, currentCharacter: "7_2", hand: [card("temple"), card("stable")], allowed: false},
+        {buildDistricts: 0, hand: [card("temple")], allowed: false},
+        {buildDistricts: 0, hand: [card("stable")], allowed: true},
+        {buildDistricts: 0, currentCharacter: "6_3", hand: [card("market")], allowed: true},
+        {buildDistricts: 0, hand: [card("temple", {wizard: true})], allowed: true},
+        {buildDistricts: 1, buildingBan: true, hand: [card("temple")], allowed: false},
+        {buildDistricts: 1, hand: [card("secret_vault")], allowed: false},
+        {buildDistricts: 1, hand: [card("temple")], allowed: true},
+        {buildDistricts: 1, hand: [card("framework")], allowed: true},
+        {buildDistricts: 1, hand: [], allowed: false}
+    ];
+    for (const {hand, allowed, ...state} of cases) {
+        const {game, emitted} = gameClient({playerGold: {0: 0}, player: {action: null, hand},
+            playerDistricts: {0: [card("framework")]}, ...state});
+        game.handleDistrictAction("framework", 0);
+        assert.equal(game.state.userAction, allowed ? "framework" : null, JSON.stringify(state) + JSON.stringify(hand));
+        assert.deepEqual(emitted, []);
+    }
+});
+test("Diplomat hints distinguish the first choice, the second choice and cancellation", () => {
+    for (const slot of [0, 1]) {
+        const {game, emitted} = gameClient({player: {action: "diplomat-action", hand: []}, playerGold: {0: 9},
+            playerDistricts: {0: [{type: "tavern", cost: 1}], 1: [{type: "market", cost: 2}]}});
+        for (const target of [0, 1])
+            assert.equal(game.getRankEightTarget(target, 0).details, "Выберите первую сторону обмена");
+        game.handleClickBuilding(slot, 0);
+        assert.equal(game.getRankEightTarget(slot, 0).details, "Выберите вторую сторону обмена");
+        const pair = game.getRankEightTarget(1 - slot, 0);
+        assert.equal(pair.cost, 1);
+        assert.equal(pair.details, null);
+        game.state.playerGold[0] = 0;
+        const blocked = game.getRankEightTarget(1 - slot, 0);
+        assert.equal(blocked.cost, 1);
+        assert.equal(blocked.reason, "Недостаточно золота: нужно 1");
+        assert.equal(blocked.details, null);
+        game.handleClickBuilding(slot, 0);
+        assert.equal(game.getRankEightTarget(slot, 0).details, "Выберите первую сторону обмена");
         assert.deepEqual(emitted, []);
     }
 });

@@ -322,3 +322,110 @@ test("Magistrate response timeout declines a blocked confiscation and returns co
     assert.equal(game.room.timer, null);
     game.clearTurnTimer();
 });
+function completingMagistratedBuild({recipientCompletes = false, trueMark = true} = {}) {
+    const result = actingRoom(null, {citySize: 2, bonuses: {firstCity: 4, otherCities: 2, allColors: 0}});
+    const {game} = result;
+    game.room.currentPlayer = 1;
+    game.room.currentCharacter = '8_1';
+    game.room.buildDistricts = 1;
+    game.state.characterRoles = {'1_3': 0, '8_1': 1};
+    game.room.magistrated = ['8_1', '7_1'];
+    game.state.trueMagistrated = trueMark ? '8_1' : '7_1';
+    game.state.firstBuilding = false;
+    game.state.players[1].action = 'warlord-action';
+    game.state.players[1].hand = [district('tavern')];
+    game.room.playerHand[1] = 1;
+    game.room.playerDistricts[1] = [district('temple')];
+    game.room.playerDistricts[0] = recipientCompletes ? [district('market')] : [];
+    game.userEvent('player-1', 'build', [0]);
+    return result;
+}
+
+function finishMagistratedRound(game) {
+    game.room.tookResource = true;
+    game.state.currentIndCharacter = game.room.characterInGame.length;
+    game.userEvent('player-1', 'end-turn', []);
+}
+
+test('a confiscated completing build does not award a first city or end the game', () => {
+    const {game, messages} = completingMagistratedBuild();
+    assert.equal(game.room.currentPlayer, 0);
+    assert.equal(game.state.players[0].action, 'magistrate-open');
+    assert.equal(game.room.ender, null);
+    assert.ok(!game.room.playerScoreDetails[1].bonuses.some(bonus => bonus.id === 'first_city'));
+    assert.ok(!messages.some(message => message.event === 'state' && message.data.sound === 'city-complete'));
+    game.userEvent('host', 'magistrate-open', ['yes']);
+    assert.equal(game.room.playerDistricts[1].length, 1);
+    assert.equal(game.room.playerDistricts[0].length, 1);
+    assert.equal(game.room.ender, null);
+    assert.equal(game.room.playerScore[1], 1);
+    const round = game.room.roundNumber;
+    finishMagistratedRound(game);
+    assert.equal(game.room.phase, 1);
+    assert.equal(game.room.roundNumber, round + 1);
+    assert.equal(game.room.winnerPlayer, null);
+    game.clearTurnTimer();
+});
+
+test('confiscation can confirm the Magistrate as the first completed city', () => {
+    const {game, messages} = completingMagistratedBuild({recipientCompletes: true});
+    assert.equal(game.room.ender, null);
+    game.userEvent('host', 'magistrate-open', ['yes']);
+    assert.equal(game.room.ender, 0);
+    assert.equal(game.room.playerScore[0], 7);
+    assert.equal(game.room.playerScore[1], 1);
+    assert.ok(messages.some(message => message.event === 'state' && message.data.sound === 'city-complete'));
+    finishMagistratedRound(game);
+    assert.equal(game.room.phase, 0);
+    assert.equal(game.room.winnerPlayer, 0);
+    game.clearTurnTimer();
+});
+
+test('declining confiscation or revealing a bluff confirms the builder completion', () => {
+    for (const [ans, trueMark] of [['no', true], ['yes', false]]) {
+        const {game, messages} = completingMagistratedBuild({trueMark});
+        assert.equal(game.room.ender, null);
+        game.userEvent('host', 'magistrate-open', [ans]);
+        assert.equal(game.room.ender, 1);
+        assert.equal(game.room.playerDistricts[1].length, 2);
+        assert.equal(game.room.playerScore[1], 6);
+        assert.ok(messages.some(message => message.event === 'state' && message.data.sound === 'city-complete'));
+        finishMagistratedRound(game);
+        assert.equal(game.room.phase, 0);
+        assert.equal(game.room.winnerPlayer, 1);
+        game.clearTurnTimer();
+    }
+});
+
+test('a pending completing build stays unconfirmed after snapshot restoration', () => {
+    const {game} = completingMagistratedBuild();
+    const saved = JSON.parse(JSON.stringify(game.getSnapshot()));
+    game.clearTurnTimer();
+    const restored = createRoom().game;
+    restored.setSnapshot(saved);
+    assert.equal(restored.room.ender, null);
+    assert.equal(restored.state.magistrateAction.wasComplete, false);
+    restored.userEvent('host', 'magistrate-open', ['yes']);
+    assert.equal(restored.room.ender, null);
+    assert.equal(restored.room.playerScore[1], 1);
+    finishMagistratedRound(restored);
+    assert.equal(restored.room.phase, 1);
+    restored.clearTurnTimer();
+});
+
+test('Magistrate response timeout confirms the builder completion before the main turn expires', async t => {
+    const {game} = completingMagistratedBuild();
+    t.after(() => game.clearTurnTimer());
+    game.room.timer = {kind: 'response', ownerSlot: 0, character: '8_1', responseType: 'magistrate-open', endsAt: Date.now() - 1};
+    game.restoreTurnTimer();
+    await new Promise(resolve => setTimeout(resolve, 25));
+    assert.equal(game.room.currentPlayer, 1);
+    assert.equal(game.room.ender, 1);
+    assert.equal(game.room.playerScore[1], 6);
+    game.state.currentIndCharacter = game.room.characterInGame.length;
+    game.room.timer = {kind: 'main', ownerSlot: 1, character: '8_1', endsAt: Date.now() - 1};
+    game.restoreTurnTimer();
+    await new Promise(resolve => setTimeout(resolve, 25));
+    assert.equal(game.room.phase, 0);
+    assert.equal(game.room.winnerPlayer, 1);
+});

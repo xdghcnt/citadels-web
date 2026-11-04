@@ -14,9 +14,9 @@
 
         tavern: {name: "Таверна", type: 6, cost: 1, quantity: 5},
         market: {name: "Рынок", type: 6, cost: 2, quantity: 4},
-        trading_post: {name: "Фактория", type: 6, cost: 2, quantity: 3},
+        trading_post: {name: "Лавка", type: 6, cost: 2, quantity: 3},
         docks: {name: "Доки", type: 6, cost: 3, quantity: 3},
-        harbor: {name: "Порт", type: 6, cost: 4, quantity: 3},
+        harbor: {name: "Гавань", type: 6, cost: 4, quantity: 3},
         town_hall: {name: "Ратуша", type: 6, cost: 5, quantity: 2},
 
         temple: {name: "Храм", type: 5, cost: 1, quantity: 3},
@@ -24,9 +24,9 @@
         monastery: {name: "Монастырь", type: 5, cost: 3, quantity: 3},
         cathedral: {name: "Собор", type: 5, cost: 5, quantity: 2},
 
-        watchtower: {name: "Сторожевая башня", type: 8, cost: 1, quantity: 3},
+        watchtower: {name: "Дозорная башня", type: 8, cost: 1, quantity: 3},
         prison: {name: "Тюрьма", type: 8, cost: 2, quantity: 3},
-        barracks: {name: "Казарма", type: 8, cost: 3, quantity: 3},
+        barracks: {name: "Казармы", type: 8, cost: 3, quantity: 3},
         fortress: {name: "Крепость", type: 8, cost: 5, quantity: 2},
 
         secret_vault: {name: "Тайное убежище", type: 9, cost: 0, quantity: 1},
@@ -42,7 +42,7 @@
         basilica: {name: "Базилика", type: 9, cost: 4, quantity: 1},
         museum: {name: "Музей", type: 9, cost: 4, quantity: 1},
         quarry: {name: "Каменоломня", type: 9, cost: 4, quantity: 1},
-        ivory_tower: {name: "Башня слоновой кости", type: 9, cost: 5, quantity: 1},
+        ivory_tower: {name: "Башня из слоновой кости", type: 9, cost: 5, quantity: 1},
         well_of_wishes: {name: "Колодец желаний", type: 9, cost: 5, quantity: 1},
         factory: {name: "Фабрика", type: 9, cost: 5, quantity: 1},
         map_room: {name: "Зал картографии", type: 9, cost: 5, quantity: 1},

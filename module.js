@@ -838,7 +838,7 @@ function init(wsServer, path) {
                     room.currentPlayer = slot;
                     if (responderSlot !== slot && state.players[responderSlot]) {
                         if (state.players[responderSlot].action === 'magistrate-open' && state.magistrateAction)
-                            tax(slot);
+                            tax(slot, getCityCompletePayload(slot, state.magistrateAction.wasComplete));
                         if (state.players[responderSlot].action === 'blackmailed-open') {
                             const blackmailedIndex = room.blackmailed.indexOf(room.currentCharacter);
                             if (blackmailedIndex !== -1)
@@ -1055,16 +1055,13 @@ function init(wsServer, path) {
                     room.playerHand[slot] -= 1;
                     if (replaceCardInd !== undefined)
                         destroy(slot, replaceCardInd);
-                    if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
-                        room.ender = slot;
                     return [true, noRequireGold ? 0 : cost];
                 },
                 wasBuilded = (slot, cost, payload, wasComplete) => {
-                    payload = getCityCompletePayload(slot, wasComplete, payload);
                     const building = room.playerDistricts[slot][room.playerDistricts[slot].length - 1];
                     const magistate = state.characterRoles["1_3"];
                     if (magistate !== undefined && slot !== magistate && room.magistrated.includes(room.currentCharacter) && (state.gameRules.magistrateOverLimit || setupConfig.canAddDistrict(room.playerDistricts[magistate], building.type, state.gameRules)) && !state.firstBuilding) {
-                        state.magistrateAction = {cost: cost, action: state.players[slot].action};
+                        state.magistrateAction = {cost: cost, action: state.players[slot].action, wasComplete};
                         state.players[slot].action = null;
                         countPoints(slot);
                         sendStateSlot(slot);
@@ -1077,9 +1074,12 @@ function init(wsServer, path) {
                         return;
                     }
                     state.firstBuilding = true;
-                    tax(slot, payload);
+                    tax(slot, getCityCompletePayload(slot, wasComplete, payload));
                 },
                 tax = (slot, payload) => {
+                    // Confirm completion only after the Magistrate has resolved ownership.
+                    if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
+                        room.ender = slot;
                     if (room.characterInGame[8] === "9_3" && room.currentCharacter !== "9_3" && room.playerGold[slot]) {
                         room.playerGold[slot] -= 1;
                         room.tax += 1;
@@ -1091,7 +1091,9 @@ function init(wsServer, path) {
                 destroy = (slot_d, cardInd) => {
                     const building = room.playerDistricts[slot_d][cardInd];
                     if (building) {
+                        delete building.buildDiscount;
                         if (building.exposition) {
+                            building.exposition.forEach(card => { delete card.buildDiscount; });
                             discardCards(building.exposition);
                             delete building.exposition;
                         }
@@ -1332,10 +1334,6 @@ function init(wsServer, path) {
                             room.magistrated = [];
                             room.trueMagistrated = state.trueMagistrated;
 
-
-                            if (room.ender === null && getDistrictsCount(slot) >= state.maxDistricts)
-                                room.ender = slot;
-
                             countPoints(magistratedSlot);
                             countPoints(room.currentPlayer);
                             payingSlot = slot;
@@ -1347,7 +1345,7 @@ function init(wsServer, path) {
                         room.currentPlayer = magistratedSlot;
                         state.firstBuilding = true;
                         room.targetSlot = null;
-                        tax(payingSlot, getCityCompletePayload(slot, wasComplete));
+                        tax(payingSlot, getCityCompletePayload(payingSlot, payingSlot === slot ? wasComplete : state.magistrateAction.wasComplete));
                         restorePausedMainTimer(magistratedSlot);
                         update();
                     }
@@ -1787,7 +1785,7 @@ function init(wsServer, path) {
                     const target = (room.playerDistricts[targetSlot] || [])[cardInd];
                     if (!districtActionAllowed(slot) || !source || !target || source === target) return;
                     if (getDistrictsCount(targetSlot) >= state.maxDistricts)
-                        return sendSlot(slot, "message", 'Вы не можете использовать Арсенал на законченном городе');
+                        return sendSlot(slot, "message", 'Вы не можете использовать Оружейную на законченном городе');
                     destroy(targetSlot, cardInd);
                     destroy(slot, room.playerDistricts[slot].indexOf(source));
                     countPoints(targetSlot); countPoints(slot);
@@ -1880,6 +1878,7 @@ function init(wsServer, path) {
                     const source = districtSource(slot, 'laboratory', sourceIndex);
                     if (!districtActionAllowed(slot) || !source || !state.players[slot].hand[cardInd]) return;
                     useDistrict(source);
+                    delete state.players[slot].hand[cardInd].buildDiscount;
                     dropCardHand(slot, cardInd);
                     room.playerHand[slot] = state.players[slot].hand.length;
                     room.playerGold[slot] += 2;
@@ -1911,7 +1910,10 @@ function init(wsServer, path) {
                     if (!result[0]) return;
                     room.playerGold[slot] -= cost;
                     state.alchemistCoins += cost;
-                    for (const card of cardsToDrop) dropCardHand(slot, hand.indexOf(card));
+                    for (const card of cardsToDrop) {
+                        delete card.buildDiscount;
+                        dropCardHand(slot, hand.indexOf(card));
+                    }
                     room.playerHand[slot] = hand.length;
                     wasBuilded(slot, cost, null, wasComplete);
                 },

@@ -180,7 +180,7 @@ class Card extends React.Component {
         const activeBan = !!banSource && data.phase !== 0 && data.buildingBan && banSource.round === data.roundNumber;
         const pendingBan = !!banSource && data.phase !== 0 && data.nextRoundBuildingBan && banSource.round === data.roundNumber + 1;
         const spentBan = this.props.play && card.type === "judicial_chamber" && card.judicialUsed && !activeBan && !pendingBan;
-        const discount = !isCharacter && !this.props.play && Number.isFinite(card.buildDiscount) ? Math.max(0, card.buildDiscount) : 0;
+        const discount = !isCharacter && !isSecretVault && !this.props.play && Number.isFinite(card.buildDiscount) ? Math.max(0, card.buildDiscount) : 0;
         const markers = <>
             {discount > 0 ? <span className="district-discount-marker" aria-label={"Постоянная скидка на строительство: " + discount}>
                 <span className="district-discount-coin" aria-hidden="true"/><strong>−{discount}</strong>
@@ -197,8 +197,8 @@ class Card extends React.Component {
         if (mirrorTarget && mirrorTarget.reason) hints.push(mirrorTarget.reason);
         if (targetPreview) {
             if (targetPreview.reason) hints.push(targetPreview.reason);
-            if (targetPreview.cost != null) hints.push("Плата: " + targetPreview.cost + " золота", targetPreview.details);
-            else if (!targetPreview.reason) hints.push("Выберите вторую сторону обмена");
+            if (targetPreview.cost != null) hints.push("Плата: " + targetPreview.cost + " золота");
+            else if (!targetPreview.reason && targetPreview.details) hints.push(targetPreview.details);
         }
         if (this.props.play && card.type === "winery") hints.push("Выдержка: " + (card.wineAge || 0) + "/5" + (card.wineAge >= 5 ? " · +3 очка" : ""));
         if (this.props.play && card.type === "judicial_chamber") hints.push(activeBan ? "Запрет строительства действует в этом раунде" : pendingBan ? "Запрет строительства начнётся в следующем раунде" : card.judicialUsed ? "Способность использована" : "Запрет доступен");
@@ -723,69 +723,85 @@ class CreateGamePanel extends React.Component {
         const citySize = automatic ? CitadelsSetup.getCitySize(this.playerCount) : this.state.rules.citySize;
         const exactUnique = this.state.starting.exactUnique;
         return <div className="starting-settings">
-            <div className="create-game-subtitle">Стартовые ресурсы</div>
-            <div className="starting-settings-fields">
-                {[
-                    ["handSize", "Карт на старте"],
-                    ["minUnique", exactUnique ? "Особых кварталов на старте" : "Минимум особых кварталов"],
-                    ["gold", "Стартовое золото"]
-                ].map(([key, label]) => <div className="starting-setting" key={key}>
-                    <div className="starting-number">
-                        <label htmlFor={"starting-" + key}>{label}</label>
-                        <SetupNumberInput id={"starting-" + key} label={label}
-                               value={this.state.starting[key]} disabled={busy}
-                               max={key === "minUnique" ? Math.max(0, this.state.starting.handSize - this.state.starting.firstCrownReduction.cards) : undefined}
-                               invalid={!Number.isSafeInteger(this.state.starting[key]) || this.state.starting[key] < 0
-                                   || (key === "minUnique" && this.state.starting[key] > this.state.starting.handSize - this.state.starting.firstCrownReduction.cards)}
-                               onChange={value => this.handleSetupNumberChange("starting", key, value)}/>
+            <section className="starting-settings-group" aria-labelledby="resources-settings-title">
+                <div className="create-game-subtitle" id="resources-settings-title">Ресурсы</div>
+                <div className="setup-settings-columns">
+                    <div className="setup-settings-column">
+                        <div className="setup-settings-column-title">На старте каждому игроку</div>
+                        <div className="starting-settings-fields">
+                            {[
+                                ["handSize", "Карт на старте"],
+                                ["minUnique", exactUnique ? "Особых кварталов на старте" : "Минимум особых кварталов"],
+                                ["gold", "Стартовое золото"]
+                            ].map(([key, label]) => <div className="starting-setting" key={key}>
+                                <div className="starting-number">
+                                    <label htmlFor={"starting-" + key}>{label}</label>
+                                    <SetupNumberInput id={"starting-" + key} label={label}
+                                           value={this.state.starting[key]} disabled={busy}
+                                           max={key === "minUnique" ? Math.max(0, this.state.starting.handSize - this.state.starting.firstCrownReduction.cards) : undefined}
+                                           invalid={!Number.isSafeInteger(this.state.starting[key]) || this.state.starting[key] < 0
+                                               || (key === "minUnique" && this.state.starting[key] > this.state.starting.handSize - this.state.starting.firstCrownReduction.cards)}
+                                           onChange={value => this.handleSetupNumberChange("starting", key, value)}/>
+                                </div>
+                                {key === "minUnique" ? <label className="starting-unique-option">
+                                    <input type="checkbox" checked={exactUnique} disabled={busy}
+                                           onChange={event => this.setState({starting: Object.assign({}, this.state.starting, {exactUnique: event.target.checked})})}/>
+                                    Фиксированное число
+                                </label> : null}
+                            </div>)}
+                        </div>
+                        <p className="setup-hint">{exactUnique
+                            ? "Указанное число особых кварталов. Остальные карты руки — базовые."
+                            : "Особых кварталов может выпасть больше указанного минимума."}</p>
                     </div>
-                    {key === "minUnique" ? <label className="starting-unique-option">
-                        <input type="checkbox" checked={exactUnique} disabled={busy}
-                               onChange={event => this.setState({starting: Object.assign({}, this.state.starting, {exactUnique: event.target.checked})})}/>
-                        Фиксированное число
-                    </label> : null}
-                </div>)}
-            </div>
-            <p className="setup-hint">{exactUnique
-                ? "Каждому игроку — указанное число особых кварталов. Остальные карты стартовой руки — базовые."
-                : "Каждому игроку. Особых кварталов может выпасть больше указанного минимума."}</p>
-            <div className="create-game-subtitle">Первому владельцу короны уменьшить</div>
-            <div className="starting-settings-fields crown-settings-fields">
-                {[["cards", "Число карт на"], ["gold", "Число золотых на"]].map(([key, label]) =>
-                    <div className="starting-number" key={key}>
-                        <label htmlFor={"crown-reduction-" + key}>{label}</label>
-                        <SetupNumberInput id={"crown-reduction-" + key} label={label}
-                               value={this.state.starting.firstCrownReduction[key]} disabled={busy}
-                               max={Math.max(0, key === "cards" ? this.state.starting.handSize - this.state.starting.minUnique : this.state.starting.gold)}
-                               invalid={!Number.isSafeInteger(this.state.starting.firstCrownReduction[key]) || this.state.starting.firstCrownReduction[key] < 0
-                                   || (key === "cards" && this.state.starting.firstCrownReduction.cards > this.state.starting.handSize - this.state.starting.minUnique)
-                                   || (key === "gold" && this.state.starting.firstCrownReduction.gold > this.state.starting.gold)}
-                               onChange={value => this.handleNestedNumberChange("starting", "firstCrownReduction", key, value)}/>
-                    </div>)}
-            </div>
-            <p className="setup-hint">Только при начале партии. Минимум особых кварталов сохраняется и для владельца короны.</p>
-            <div className="city-settings-block">
-                <div className="create-game-subtitle">Завершение города</div>
-                <div className="city-settings">
-                    <label htmlFor="city-size">Кварталов для завершения города</label>
-                    <SetupNumberInput id="city-size" label="Кварталов для завершения города" min={2} max={10}
-                           value={citySize} disabled={busy}
-                           invalid={!Number.isInteger(citySize) || citySize < 2 || citySize > 10}
-                           onChange={value => this.handleSetupNumberChange("rules", "citySize", value)}/>
+                    <div className="setup-settings-column">
+                        <div className="setup-settings-column-title">Первому владельцу короны уменьшить</div>
+                        <div className="starting-settings-fields">
+                            {[["cards", "Число карт на"], ["gold", "Число золотых на"]].map(([key, label]) =>
+                                <div className="starting-number" key={key}>
+                                    <label htmlFor={"crown-reduction-" + key}>{label}</label>
+                                    <SetupNumberInput id={"crown-reduction-" + key} label={label}
+                                           value={this.state.starting.firstCrownReduction[key]} disabled={busy}
+                                           max={Math.max(0, key === "cards" ? this.state.starting.handSize - this.state.starting.minUnique : this.state.starting.gold)}
+                                           invalid={!Number.isSafeInteger(this.state.starting.firstCrownReduction[key]) || this.state.starting.firstCrownReduction[key] < 0
+                                               || (key === "cards" && this.state.starting.firstCrownReduction.cards > this.state.starting.handSize - this.state.starting.minUnique)
+                                               || (key === "gold" && this.state.starting.firstCrownReduction.gold > this.state.starting.gold)}
+                                           onChange={value => this.handleNestedNumberChange("starting", "firstCrownReduction", key, value)}/>
+                                </div>)}
+                        </div>
+                        <p className="setup-hint">Только в начале партии. Минимум особых сохраняется и для владельца короны.</p>
+                    </div>
                 </div>
-                <p className="setup-hint">{automatic ? "Автоматически: 8 для троих, 7 для остальных составов." : "Заданный размер сохраняется при изменении числа игроков."}</p>
-            </div>
-            <div className="create-game-subtitle">Бонусные очки</div>
-            <div className="starting-settings-fields">
-                {[["firstCity", "Первому завершившему город"], ["otherCities", "Остальным завершившим город"], ["allColors", "За все пять цветов"]].map(([key, label]) =>
-                    <div className="starting-number" key={key}>
-                        <label htmlFor={"bonus-" + key}>{label}</label>
-                        <SetupNumberInput id={"bonus-" + key} label={label}
-                               value={this.state.rules.bonuses[key]} disabled={busy}
-                               invalid={!Number.isSafeInteger(this.state.rules.bonuses[key]) || this.state.rules.bonuses[key] < 0}
-                               onChange={value => this.handleNestedNumberChange("rules", "bonuses", key, value)}/>
-                    </div>)}
-            </div>
+            </section>
+            <section className="starting-settings-group" aria-labelledby="city-settings-title">
+                <div className="create-game-subtitle" id="city-settings-title">Завершение города</div>
+                <div className="setup-settings-columns">
+                    <div className="setup-settings-column">
+                        <div className="setup-settings-column-title">Размер города</div>
+                        <div className="starting-number">
+                            <label htmlFor="city-size">Кварталов для завершения города</label>
+                            <SetupNumberInput id="city-size" label="Кварталов для завершения города" min={2} max={10}
+                                   value={citySize} disabled={busy}
+                                   invalid={!Number.isInteger(citySize) || citySize < 2 || citySize > 10}
+                                   onChange={value => this.handleSetupNumberChange("rules", "citySize", value)}/>
+                        </div>
+                        <p className="setup-hint">{automatic ? "Автоматически: 8 для троих, 7 для остальных составов." : "Заданный размер сохраняется при изменении числа игроков."}</p>
+                    </div>
+                    <div className="setup-settings-column">
+                        <div className="setup-settings-column-title">Бонусные очки</div>
+                        <div className="starting-settings-fields">
+                            {[["firstCity", "Первому завершившему город"], ["otherCities", "Остальным завершившим город"], ["allColors", "За все пять цветов"]].map(([key, label]) =>
+                                <div className="starting-number" key={key}>
+                                    <label htmlFor={"bonus-" + key}>{label}</label>
+                                    <SetupNumberInput id={"bonus-" + key} label={label}
+                                           value={this.state.rules.bonuses[key]} disabled={busy}
+                                           invalid={!Number.isSafeInteger(this.state.rules.bonuses[key]) || this.state.rules.bonuses[key] < 0}
+                                           onChange={value => this.handleNestedNumberChange("rules", "bonuses", key, value)}/>
+                                </div>)}
+                        </div>
+                    </div>
+                </div>
+            </section>
             <button type="button" className="starting-settings-reset" disabled={busy}
                     title="Сбросить стартовые ресурсы, уменьшения для первой короны, размер города, бонусы, лимит повторяющихся карт и настройки Дипломата и Магистрата"
                     onClick={() => this.handleResetStartingSettings()}>По умолчанию</button>
@@ -1602,20 +1618,6 @@ class DistrictPileCounters extends SetupHelp {
     }
 }
 
-function DistrictEffectsStatus({data, game}) {
-    const targets = data.player && data.player.conspiratorTargets || [];
-    if (!targets.length && !data.theaterAction) return null;
-    return <div className="district-effects-status" role="status">
-        {targets.length ? <div className="private-district-targets"><span>Ваши действующие тайные цели:</span>
-            {targets.map((target, index) => <div key={index} className="private-district-target">
-                <span>{target.sourceIndex == null ? "Источник покинул город" : "Дом заговорщиков"}</span>
-                <Card card={target.characterId} type="character" game={game} isToken={true}/>
-            </div>)}
-        </div> : null}
-        {data.theaterAction ? <div>Театр · {window.commonRoom.getPlayerName(data.playerSlots[data.currentPlayer])} · обмен {data.theaterAction.position} из {data.theaterAction.total}. Порядок — по выбору персонажей.</div> : null}
-    </div>;
-}
-
 function DistrictActions({game, data}) {
     if (!game.canUseDistrictActions()) return null;
     const city = data.playerDistricts[data.userSlot] || [];
@@ -1627,7 +1629,7 @@ function DistrictActions({game, data}) {
         const used = data.turnId != null && card.actionsUsed && card.actionsUsed[card.type] === data.turnId;
         let unavailable = used;
         if (["museum", "laboratory", "framework", "architects_workshop"].includes(card.type) && !hand.length) unavailable = true;
-        if (card.type === "framework" && (!data.buildDistricts || data.buildingBan)) unavailable = true;
+        if (card.type === "framework" && !game.canUseFramework(sourceIndex)) unavailable = true;
         if (card.type === "forgery" && gold < 2) unavailable = true;
         if (card.type === "architects_workshop" && gold < 3) unavailable = true;
         if (card.type === "divination_tower" && !data.districtDeckCount) unavailable = true;
@@ -1638,7 +1640,7 @@ function DistrictActions({game, data}) {
         return <button key={sourceIndex} disabled={emptyFleaMarket}
             title={emptyFleaMarket ? "Для обмена нужна хотя бы одна карта в руке" : undefined}
             onClick={() => game.handleDistrictAction(card.type, sourceIndex)}>
-            {card.type === "museum" ? "Исп. Музей" : CitadelsSetup.districts[card.type].name}{city.filter(item => item.type === card.type).length > 1 ? " (" + (city.slice(0, sourceIndex + 1).filter(item => item.type === card.type).length) + ")" : ""}{price}
+            {card.type === "museum" ? "Исп. Музей" : card.type === "flea_market" ? "Исп. Барахолку" : CitadelsSetup.districts[card.type].name}{city.filter(item => item.type === card.type).length > 1 ? " (" + (city.slice(0, sourceIndex + 1).filter(item => item.type === card.type).length) + ")" : ""}{price}
             {emptyFleaMarket ? " · нет карт в руке" : ""}
         </button>;
     })}</>;
@@ -1782,7 +1784,7 @@ class Game extends React.Component {
             };
         if (!hasLocalSelection)
             return;
-        if (state.userAction === "flea_market" && !this.isFleaMarketSelectionCurrent(state))
+        if (state.userAction === "flea_market" && !this.isFleaMarketContextCurrent(state))
             return resetLocalSelection();
         if (state.mirrorTarget && this.state.player && state.player
             && JSON.stringify(this.state.player.hand) !== JSON.stringify(state.player.hand))
@@ -1904,12 +1906,10 @@ class Game extends React.Component {
 
     handleClickHandCard(cardInd, forGold) {
         if (this.state.userAction === "flea_market") {
-            if (!this.isFleaMarketSelectionCurrent()) return this.handleStopUserAction();
+            if (!this.isFleaMarketContextCurrent()) return this.handleStopUserAction();
             if (!Number.isInteger(cardInd) || !this.state.player.hand[cardInd]) return;
-            const selected = this.state.cardChosen[0] === cardInd;
-            this.setState({cardChosen: selected ? [] : [cardInd], fleaMarketContext: Object.assign({}, this.state.fleaMarketContext, {
-                selectedCard: selected ? null : JSON.stringify(this.state.player.hand[cardInd])
-            })});
+            this.socket.emit("flea-market-action", cardInd, this.state.districtSource);
+            this.handleStopUserAction();
             return;
         }
         if (this.state.userAction === "mirror_hall" && this.state.buildTarget === cardInd)
@@ -2021,9 +2021,8 @@ class Game extends React.Component {
         else if (pair && ownCard && opponentCard && (!CitadelsSetup.canAddDistrict(ownCity, opponentCard.type, rules, {removeIndex: ownIndex})
             || !CitadelsSetup.canAddDistrict(opponentCity, ownCard.type, rules, {removeIndex: opponentIndex}))) reason = "Обмен превысит лимит повторяющихся карт";
         else if (cost !== null && (data.playerGold && data.playerGold[data.userSlot] || 0) < cost) reason = "Недостаточно золота: нужно " + cost;
-        const details = cost !== null ? "Стоимость чужого квартала " + this.getCardValue(opponentCard)
-            + " + Великие стены " + CitadelsSetup.getGreatWallCount(opponentCity)
-            + " − стоимость своего квартала " + this.getCardValue(ownCard) + "; не ниже 0" : null;
+        const details = cost !== null ? null
+            : selected.length ? "Выберите вторую сторону обмена" : "Выберите первую сторону обмена";
         return {cost, available: !reason, reason, details};
     }
 
@@ -2124,7 +2123,7 @@ class Game extends React.Component {
 
     getHandBuildHint(index) {
         if (this.state.userAction === "flea_market")
-            return this.state.cardChosen.includes(index) ? "Карта выбрана для обмена Барахолкой" : "Выберите эту карту для обмена Барахолкой";
+            return "Нажмите, чтобы обменять карту Барахолкой";
         const {cost, reason} = this.getHandBuildStatus(index);
         return reason || "Стоимость постройки: " + cost;
     }
@@ -2243,6 +2242,13 @@ class Game extends React.Component {
             && !["magistrate-open", "seer-return", "blackmailed-response", "blackmailed-open", "emperor-nores-action"].includes(data.player.action);
     }
 
+    canUseFramework(sourceIndex) {
+        const data = this.state, city = data.playerDistricts[data.userSlot] || [];
+        const source = city[sourceIndex];
+        return this.canUseDistrictActions() && data.winnerPlayer == null && Number.isInteger(sourceIndex)
+            && !!source && source.type === "framework"
+            && (data.player.hand || []).some((_, index) => !this.getHandBuildStatus(index, {frameworkIndex: sourceIndex}).reason);
+    }
     canUseFleaMarket(sourceIndex, data = this.state) {
         const source = data.playerDistricts && data.playerDistricts[data.userSlot] && data.playerDistricts[data.userSlot][sourceIndex];
         return this.canUseDistrictActions(data) && data.winnerPlayer == null && Number.isInteger(sourceIndex)
@@ -2250,33 +2256,23 @@ class Game extends React.Component {
             && !(data.turnId != null && source.actionsUsed && source.actionsUsed.flea_market === data.turnId);
     }
 
-    isFleaMarketSelectionCurrent(data = this.state) {
+    isFleaMarketContextCurrent(data = this.state) {
         const context = data.fleaMarketContext;
-        if (!context || !this.canUseFleaMarket(data.districtSource, data)) return false;
-        const selected = data.cardChosen[0];
-        return context.turnId === data.turnId && context.userSlot === data.userSlot && context.sourceIndex === data.districtSource
+        return !!context && this.canUseFleaMarket(data.districtSource, data)
+            && context.turnId === data.turnId && context.userSlot === data.userSlot && context.sourceIndex === data.districtSource
             && context.source === JSON.stringify(data.playerDistricts[data.userSlot][data.districtSource])
-            && context.hand === JSON.stringify(data.player.hand)
-            && (!data.cardChosen.length || (data.cardChosen.length === 1 && Number.isInteger(selected)
-                && !!data.player.hand[selected] && context.selectedCard === JSON.stringify(data.player.hand[selected])));
-    }
-
-    handleFleaMarketExchange() {
-        if (this.state.userAction !== "flea_market") return;
-        if (!this.isFleaMarketSelectionCurrent()) return this.handleStopUserAction();
-        if (this.state.cardChosen.length !== 1) return;
-        this.socket.emit("flea-market-action", this.state.cardChosen[0], this.state.districtSource);
-        this.handleStopUserAction();
+            && context.hand === JSON.stringify(data.player.hand);
     }
 
     handleDistrictAction(type, sourceIndex) {
         if (!this.canUseDistrictActions()) return;
+        if (type === "framework" && !this.canUseFramework(sourceIndex)) return;
         if (type === "flea_market") {
             if (!this.canUseFleaMarket(sourceIndex)) return;
             this.setUserAction(type, {districtSource: sourceIndex, fleaMarketContext: {
                 turnId: this.state.turnId, userSlot: this.state.userSlot, sourceIndex,
                 source: JSON.stringify(this.state.playerDistricts[this.state.userSlot][sourceIndex]),
-                hand: JSON.stringify(this.state.player.hand), selectedCard: null
+                hand: JSON.stringify(this.state.player.hand)
             }});
             return;
         }
@@ -2643,7 +2639,7 @@ class Game extends React.Component {
                     })}
                     onMouseUp={(evt) => this.handleBodyRelease(evt)}>
                     <CommonRoom state={this.state} app={this}/>
-                    {data.phase !== 0 ?
+                    {data.phase !== 0 || data.winnerPlayer != null ?
                         <div className={cs("character-section", `characters-count-${data.characterInGame.length}`)}>
                             <div className="cards-list">
                                 {data.characterInGame.map((card, id) => {
@@ -2702,7 +2698,6 @@ class Game extends React.Component {
                     <div className="players-section">
                         {slots.map((slot) => (<PlayerSlot data={data} slot={slot} game={this}/>))}
                     </div>
-                    <DistrictEffectsStatus data={data} game={this}/>
                     <div className="control-section">
                         {data.player && data.player.hand ?
                             <div className={cs("hand-section", {noAction: !districtCardsMinimized})}>
@@ -2768,14 +2763,12 @@ class Game extends React.Component {
                                     </div>
                                     : null}
                                 {data.phase == 1.5 ?
-                                    <>
-                                        <p className="status-text">Выберите игрока для обмена персонажем</p>
-                                        <div className="action-button">
-                                            {theaterAction ?
-                                                <button onClick={() => this.handleTheater(data.userSlot)}>Отказаться от
-                                                    театра</button> : null}
-                                        </div>
-                                    </>
+                                    <div className="action-button action-toolbar prompt-toolbar">
+                                        <div className="action-prompt"><p className="status-text">Выберите игрока для обмена персонажем</p></div>
+                                        {theaterAction ?
+                                            <button onClick={() => this.handleTheater(data.userSlot)}>Отказаться от
+                                                театра</button> : null}
+                                    </div>
                                     : null}
                                 {data.phase == 2 && !data.userAction ?
                                     <div className="action-button action-toolbar">
@@ -2841,17 +2834,15 @@ class Game extends React.Component {
 
                                 {data.phase === 3 ?
                                     <div className="choose-card">
-                                        <p className="status-text">{
-                                            data.player.action === "district-peek" ? "Башня прорицателя: верхние карты по порядку (только просмотр)"
-                                                : data.player.action !== "spy-cards" ? "Выберите карту" : "Просмотр карт"
-                                        }</p>
-                                        {data.player.action === "district-peek" ? <div className="action-button"><button onClick={() => this.handleCloseDistrictPeek()}>Закрыть просмотр</button></div> : null}
-                                        {data.player.action === "spy-cards"
-                                            ? <div className="action-button">
-                                                <button onClick={() => this.handleSpyCardsEnd()}>Продолжить</button>
-                                            </div>
-                                            : ""}
-                                        <div className="cards-list">
+                                        <div className="action-button action-toolbar prompt-toolbar">
+                                            <div className="action-prompt"><p className="status-text">{
+                                                data.player.action === "district-peek" ? "Башня прорицателя: верхние карты по порядку (только просмотр)"
+                                                    : data.player.action !== "spy-cards" ? "Выберите карту" : "Просмотр карт"
+                                            }</p></div>
+                                            {data.player.action === "district-peek" ? <button onClick={() => this.handleCloseDistrictPeek()}>Закрыть просмотр</button> : null}
+                                            {data.player.action === "spy-cards" ? <button onClick={() => this.handleSpyCardsEnd()}>Продолжить</button> : null}
+                                        </div>
+                                        <div className="cards-list minimized" style={{"--choose-card-gaps": Math.max(1, (data.player.choose || []).length - 1)}}>
                                             {data.player && data.player.choose && data.player.choose.map((card, id) => (
                                                 <Card key={id} card={card} type="card" game={this} id={id}
                                                       onClick={["district-peek", "spy-cards"].includes(data.player.action) ? undefined : () => this.handleTakeCard(id)}/>
@@ -2861,11 +2852,10 @@ class Game extends React.Component {
                                     : null}
                                 {data.userAction ?
                                     <div className={data.userAction === "conspirators_house" ? "conspirators-panel" : undefined}>
-                                        <div className={cs("action-button", {"mirror-copy-actions": data.userAction === "mirror_hall", "flea-market-actions": data.userAction === "flea_market", "conspirators-actions": data.userAction === "conspirators_house"})}>
+                                        <div className={cs("action-button action-toolbar prompt-toolbar", {"conspirators-actions": data.userAction === "conspirators_house"})}>
+                                            <div className="action-prompt"><p className="status-text">{userActionText}</p></div>
                                             <button onClick={() => this.handleStopUserAction()}>Отмена действия</button>
-                                            <p className="status-text">{userActionText}</p>
-                                            {data.userAction === "flea_market" ? <button disabled={data.cardChosen.length !== 1}
-                                                onClick={() => this.handleFleaMarketExchange()}>Сбросить и взять карту</button> : null}
+
                                             {(magicianAction || denOfThievesAction)
                                                 ? <button
                                                     onClick={() => this.handleApplyAction(data.userSlot, data.cardChosen)}>
