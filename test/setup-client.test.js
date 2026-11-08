@@ -16,15 +16,16 @@ function loadClass(name, firstExcludedMethod, globals = {}) {
         setState(change) { this.state = Object.assign({}, this.state, change); }
     }
     const context = vm.createContext({React: {Component}, CitadelsSetup: setup, ...globals});
-    vm.runInContext(source.slice(start, end) + "}\nglobalThis.TestClass = " + name, context);
+    vm.runInContext(source.slice(0, source.indexOf("class Player extends React.Component")) + source.slice(start, end) + "}\nglobalThis.TestClass = " + name, context);
     return context.TestClass;
 }
 
 function mountedGame() {
+    const document = {body: {style: {}}};
     const handlers = {};
     const socket = {on(event, handler) {handlers[event] = handler;}, emit() {}};
     const Game = loadClass("Game", "getSound", {
-        localStorage: {}, document: {}, window: {socket},
+        localStorage: {}, document, window: {socket},
         CommonRoom: {
             roomInit(game) {game.socket = socket; game.userId = "host"; game.roomId = "test"; return {roomId: "test"};},
             processCommonRoom() {}
@@ -34,8 +35,53 @@ function mountedGame() {
     game.state = {...game.state, phase: 0, userSlot: 0, currentPlayer: 0, hostId: "host",
         showCreateGamePanel: true, setupPending: false, setupError: "previous error", buildTarget: null};
     game.componentDidMount();
-    return {game, handlers};
+    return {game, handlers, document};
 }
+
+test("background choice persists independently of invalid setup input and survives JSON import", () => {
+    const data = new Map();
+    const storage = {getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value)};
+    const Panel = loadClass("CreateGamePanel", "renderStartingSettings", {
+        window: {sessionStorage: storage}, FileReader: class {readAsText() {}}
+    });
+    const props = {
+        data: {phase: 0, userId: "host", hostId: "host", playerSlots: ["host", "player"]},
+        game: {roomId: "room", socket: {emit() {assert.fail("Background edits must stay local");}}}
+    };
+    const panel = new Panel(props);
+    panel.state.starting.gold = "";
+    panel.handleBackgroundChange("waterfront");
+    const restored = new Panel(props);
+    assert.equal(restored.state.backgroundId, "waterfront");
+    restored.presets = {};
+    const imported = setup.getDefaultSetup();
+    imported.starting.gold = 7;
+    restored.handleImportSetup({target: {files: [{size: 1}], value: "settings.json"}});
+    restored.importReader.result = setup.serializeSetup(imported);
+    restored.importReader.onload();
+    assert.equal(restored.state.backgroundId, "waterfront");
+    assert.equal(restored.state.starting.gold, 7);
+    assert.equal(Object.hasOwn(restored.getSetup(), "backgroundId"), false);
+    assert.equal(setup.serializeSetup(restored.getSetup()).includes('"waterfront"'), false);
+    for (const change of [{phase: 1}, {hostId: "other"}, {setupPending: true}]) {
+        const blocked = new Panel(props);
+        Object.assign(props.data, change);
+        blocked.handleBackgroundChange("royal");
+        assert.equal(blocked.state.backgroundId, "waterfront");
+        Object.assign(props.data, {phase: 0, hostId: "host", setupPending: false});
+    }
+});
+
+test("public room state applies a common background, retains it in the lobby and resets for an old room", () => {
+    const {handlers, document} = mountedGame();
+    const state = {phase: 1, hostId: "host", currentPlayer: 0, playerSlots: ["host", "player"], backgroundId: "waterfront"};
+    handlers.state(state);
+    assert.equal(document.body.style.backgroundImage, 'url("/citadels/backgrounds/waterfront.webp")');
+    handlers.state({...state, phase: 0});
+    assert.equal(document.body.style.backgroundImage, 'url("/citadels/backgrounds/waterfront.webp")');
+    handlers.state({...state, backgroundId: undefined});
+    assert.equal(document.body.style.backgroundImage, 'url("/citadels/bg.jpg")');
+});
 
 test("an externally started game closes the editor independently of the local start request", () => {
     for (const phase of [1, 1.5, 2, 3]) {
@@ -106,7 +152,7 @@ test("reset restores all four settings blocks, recovers invalid input and preser
         panel.state.basicCounts.manor = 9;
         panel.state.timerSettings.enabled = false;
         panel.state.starting = {handSize: 6, minUnique: 2, gold: 5, exactUnique: true, firstCrownReduction: {cards: 1, gold: 2}};
-        panel.state.rules = {citySize: 10, bonuses: {firstCity: 6, otherCities: 1, allColors: 0}, preventRepeatedRandomDiscard: true};
+        panel.state.rules = {citySize: 10, bonuses: {firstCity: 6, otherCities: 1, allColors: 0}, preventRepeatedRandomDiscard: true, duplicateLimit: 3, diplomatCompleteCity: true, magistrateOverLimit: true};
         const before = panel.getSetup();
         panel.state.starting.handSize = "";
         panel.state.rules.bonuses.firstCity = -1;
@@ -181,4 +227,51 @@ test("host edits persist locally across remounts without sending any socket mess
     assert.equal(writes, 2);
     const viewer = new Panel(props);
     assert.equal(viewer.state.starting.gold, 2);
+});
+
+test("structural import preserves Theater for a future four-player party", () => {
+    const Panel = loadClass("CreateGamePanel", "renderStartingSettings", {FileReader: class {readAsText() {}}});
+    const panel = new Panel({data: {phase: 0, userId: "host", hostId: "host", playerSlots: ["host", "player"]}});
+    panel.presets = {};
+    const pack = setup.getDefaultSetup(4);
+    pack.districts.unique = ["theater"];
+    panel.handleImportSetup({target: {files: [{size: 1}], value: "pack.json"}});
+    panel.importReader.result = setup.serializeSetup(pack);
+    panel.importReader.onload();
+    assert.equal(panel.state.importError, null);
+    assert.deepEqual([...panel.state.districtsSelected], ["theater"]);
+    assert.ok(setup.getStartErrors(panel.getSetup(), 2).length);
+});
+
+test("creator mode survives remount without entering the exported game setup", () => {
+    const data = new Map();
+    const storage = {getItem(k) {return data.get(k) ?? null;}, setItem(k,v) {data.set(k,v);}, removeItem(k) {data.delete(k);}};
+    const Panel = loadClass("CreateGamePanel", "renderStartingSettings", {window: {sessionStorage: storage}, document: {body: {style: {overflow: ""}}}});
+    const props = {data: {phase: 0, userId: "host", hostId: "host", playerSlots: ["host", "player"]}, game: {roomId: "creator"}};
+    const panel = new Panel(props);
+    panel.state.creatorMode = true;
+    panel.state.preserveCharacters = true;
+    panel.componentDidUpdate();
+    const restored = new Panel(props);
+    assert.equal(restored.state.creatorMode, true);
+    assert.equal(Object.hasOwn(restored.getSetup(), "creatorMode"), false);
+    assert.equal(Object.hasOwn(restored.getSetup().rules, "creatorMode"), false);
+});
+
+test('Stone Bridge is selected alongside special cards without gaining a district type', () => {
+    const Panel = loadClass('CreateGamePanel', 'renderStartingSettings');
+    const panel = new Panel({data: {phase: 0, userId: 'host', hostId: 'host', playerSlots: ['host', 'player']}});
+    assert.ok(panel.getSelectableDistricts().includes('stone_bridge'));
+    assert.equal(panel.isDistrictSelected('stone_bridge'), false);
+    const initial = panel.getSetup();
+    panel.handleClickDistrict('stone_bridge');
+    const selected = panel.getSetup();
+    assert.equal(panel.isDistrictSelected('stone_bridge'), true);
+    assert.equal(selected.districts.basic.stone_bridge, 1);
+    assert.deepEqual([...selected.districts.unique], [...initial.districts.unique]);
+    assert.equal(setup.districts.stone_bridge.type, 0);
+    const restored = setup.parseSetup(setup.serializeSetup(selected));
+    assert.equal(restored.districts.basic.stone_bridge, 1);
+    panel.handleClickDistrict('stone_bridge');
+    assert.equal(panel.getSetup().districts.basic.stone_bridge, 0);
 });
