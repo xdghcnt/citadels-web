@@ -21,6 +21,8 @@ function createRoom(players = 4) {
     }, {games: {citadels: {id: "test"}}, authUsers: {processAchievement() {}},
         achievements: {win100Citadels: {id: "win"}, winGames: {id: "games"}}});
     game.room.playerSlots = Array.from({length: 8}, (_, i) => i < players ? (i === 0 ? "host" : "player-" + i) : null);
+    // Seated players are in the room: the game sends only to those online
+    game.room.playerSlots.forEach(user => user && game.room.onlinePlayers.add(user));
     return {game, messages};
 }
 const chars = Array.from({length: 8}, (_, i) => (i + 1) + "_1");
@@ -101,6 +103,7 @@ test("invalid requests leave room and private state untouched", () => {
         ["host", chars, ["library", "library"], null, timer, undefined]
     ]) {
         const {game, messages} = createRoom();
+        game.room.onlinePlayers.add("other");
         const before = JSON.stringify(game.getSnapshot());
         assert.doesNotThrow(() => game.userEventHandlers["start-game"](...args));
         assert.equal(JSON.stringify(game.getSnapshot()), before);

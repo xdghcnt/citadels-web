@@ -71,7 +71,19 @@ function init(wsServer, path) {
             let timerTimeout = null,
                 timerId = 0;
             const
-                send = (target, event, data) => userRegistry.send(target, event, data),
+                /* Only to those online in this room. A player who left keeps the seat, and the
+                   game goes on without them (timers, other players' actions), but they are now
+                   in another room on the same channel: anything sent here would land there and
+                   replace their hand and character with this room's. */
+                send = (target, event, data) => {
+                    if (target == null)
+                        return;
+                    const online = target.forEach
+                        ? new Set([...target].filter(user => room.onlinePlayers.has(user)))
+                        : (room.onlinePlayers.has(target) ? target : null);
+                    if (online != null)
+                        userRegistry.send(online, event, data);
+                },
                 update = (payload) => {
                     updateConspiracies();
                     updateBuildingBans();
